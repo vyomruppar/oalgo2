@@ -6,55 +6,87 @@ import { SWRConfig } from "swr";
 import { fetcher } from "@/lib/api";
 import { regimeLabel, timeAgo } from "@/lib/format";
 import { LiveProvider, stageLabel, useLive } from "@/lib/live";
+import Backdrop from "./Backdrop";
 import { useApi } from "./ui";
 
-const NAV = [
-  { href: "/", label: "Overview", hint: "Scan activity and top signals" },
-  { href: "/market", label: "Market", hint: "Indexes, breadth, sectors" },
-  { href: "/strategies", label: "Strategies & Factors", hint: "Backtests and validation" },
-  { href: "/ml", label: "Model Monitor", hint: "Walk-forward ML results" },
-  { href: "/stocks", label: "Stock Explorer", hint: "Research every stock" },
-  { href: "/portfolio", label: "Portfolio & Risk", hint: "Paper trading" },
-  { href: "/alerts", label: "Alerts", hint: "Signal and risk notices" },
-  { href: "/settings", label: "Settings", hint: "Screens, weights, data" },
+type Item = { href: string; label: string; match?: string };
+const GROUPS: { title: string | null; items: Item[] }[] = [
+  {
+    title: null,
+    items: [
+      { href: "/", label: "Command" },
+      { href: "/portfolio", label: "My portfolio" },
+      { href: "/market", label: "Market" },
+    ],
+  },
+  {
+    title: "Quant lab",
+    items: [
+      { href: "/lab/factors", label: "Factors" },
+      { href: "/lab/momentum", label: "Momentum and trend" },
+      { href: "/lab/mean-reversion", label: "Mean reversion" },
+      { href: "/lab/volatility", label: "Volatility and regime" },
+      { href: "/lab/ml", label: "Machine learning" },
+      { href: "/lab/validation", label: "Validation" },
+    ],
+  },
+  {
+    title: "Research",
+    items: [
+      { href: "/stocks", label: "Stock explorer" },
+      { href: "/news", label: "News and sentiment" },
+      { href: "/alerts", label: "Alerts" },
+    ],
+  },
+  {
+    title: "System",
+    items: [
+      { href: "/system", label: "Scans and data" },
+      { href: "/settings", label: "Settings" },
+    ],
+  },
 ];
+const FLAT = GROUPS.flatMap((g) => g.items);
+
+function isOn(path: string, href: string) {
+  return href === "/" ? path === "/" : path === href || path.startsWith(`${href}/`);
+}
 
 function StatusBar() {
   const { mode, scan } = useLive();
   const { data } = useApi("/api/overview", 60000);
   const regime = regimeLabel(data?.regime?.regime);
   const last = data?.scan?.last_success;
-  const modeCls = mode === "stream" ? "bg-up" : mode === "polling" ? "bg-warn" : mode === "offline" ? "bg-down" : "bg-faint";
+  const modeCls = mode === "stream" ? "bg-up shadow-[0_0_8px_rgb(61_242_196)]" : mode === "polling" ? "bg-warn" : mode === "offline" ? "bg-down" : "bg-faint";
   const modeText = { stream: "Live updates", polling: "Polling every 5s", offline: "Backend unreachable", connecting: "Connecting" }[mode];
   return (
-    <div className="sticky top-0 z-20 border-b border-line bg-bg/95 backdrop-blur">
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 px-5 py-2 text-[11.5px]">
-        <span className="flex items-center gap-1.5 text-dim" title="How this page receives updates from the research backend">
+    <div className="sticky top-0 z-20 border-b border-line/40 bg-bg/70 backdrop-blur-xl">
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 px-5 py-2 text-[12px]">
+        <span className="flex items-center gap-2 text-dim" title="How this page receives updates from the research backend">
           <span className={`h-1.5 w-1.5 rounded-full ${modeCls}`} />
           {modeText}
         </span>
         <span className="text-dim">
-          Scan: <span className={scan.running ? "text-accent" : "text-ink"}>{scan.running ? `${stageLabel(scan.stage)} ${Math.round(scan.progress * 100)}%` : "idle"}</span>
+          Scan <span className={scan.running ? "text-accent" : "text-ink"}>{scan.running ? `${stageLabel(scan.stage)} ${Math.round(scan.progress * 100)}%` : "idle"}</span>
         </span>
         <span className="text-dim">
-          Last successful scan: <span className="text-ink">{timeAgo(last?.finished_at)}</span>
+          Last scan <span className="text-ink">{timeAgo(last?.finished_at)}</span>
         </span>
         <span className="text-dim">
-          Regime: <span className={regime.cls}>{regime.label}</span>
+          Regime <span className={regime.cls}>{regime.label}</span>
         </span>
         <span className="ml-auto flex items-center gap-3">
-          <span className="chip border-warn/40 text-warn" title="Prices are daily bars from a delayed source. Nothing here is real-time.">
+          <span className="chip border-warn/40 text-warn" title="Prices are daily bars of completed sessions from a delayed source. Nothing here is real-time.">
             End-of-day data
           </span>
-          <Link href="/alerts" className="text-dim hover:text-accent">
-            Alerts{" "}
-            {data?.unread_alerts ? <span className="num rounded-sm bg-accent/20 px-1.5 py-[1px] text-accent">{data.unread_alerts}</span> : <span className="num text-faint">0</span>}
+          <Link href="/alerts" className="text-dim hover:text-ink">
+            Alerts {data?.unread_alerts ? <span className="num rounded-full bg-accent/30 px-1.5 py-[1px] text-ink">{data.unread_alerts}</span> : <span className="num text-faint">0</span>}
           </Link>
         </span>
       </div>
       {scan.running && (
-        <div className="h-[2px] w-full bg-line">
-          <div className="h-full bg-accent transition-[width] duration-700" style={{ width: `${Math.max(2, scan.progress * 100)}%` }} />
+        <div className="h-[2px] w-full bg-line/40">
+          <div className="h-full bg-gradient-to-r from-accent via-[#5ec8ff] to-up transition-[width] duration-700" style={{ width: `${Math.max(2, scan.progress * 100)}%` }} />
         </div>
       )}
     </div>
@@ -66,39 +98,45 @@ export default function Shell({ children }: { children: React.ReactNode }) {
   return (
     <SWRConfig value={{ fetcher }}>
       <LiveProvider>
+        <Backdrop />
         <div className="flex min-h-screen">
-          <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-r border-line bg-panel md:flex">
-            <div className="border-b border-line px-4 py-4">
-              <div className="text-[13px] font-semibold tracking-tight">
+          <aside className="sticky top-0 hidden h-screen w-56 shrink-0 flex-col border-r border-line/40 bg-panel/40 backdrop-blur-xl md:flex">
+            <Link href="/" className="block border-b border-line/40 px-5 py-4">
+              <div className="display text-[15px] font-medium">
                 oalgo<span className="text-accent">2</span>
               </div>
-              <div className="mt-0.5 text-[10.5px] uppercase tracking-[0.14em] text-faint">Research command center</div>
-            </div>
-            <nav className="flex-1 overflow-y-auto py-2">
-              {NAV.map((n) => {
-                const on = n.href === "/" ? path === "/" : path.startsWith(n.href);
-                return (
-                  <Link key={n.href} href={n.href} aria-current={on ? "page" : undefined} className={`block border-l-2 px-4 py-2 transition-colors ${on ? "border-accent bg-raised" : "border-transparent hover:bg-raised/60"}`}>
-                    <div className={`text-[12.5px] font-medium ${on ? "text-accent" : "text-ink"}`}>{n.label}</div>
-                    <div className="text-[10.5px] text-faint">{n.hint}</div>
-                  </Link>
-                );
-              })}
+              <div className="mt-0.5 text-[11px] text-faint">Observatory</div>
+            </Link>
+            <nav className="flex-1 overflow-y-auto py-3" aria-label="Sections">
+              {GROUPS.map((g, gi) => (
+                <div key={gi} className="mb-3">
+                  {g.title && <div className="px-5 pb-1 pt-1 text-[11px] font-semibold text-faint">{g.title}</div>}
+                  {g.items.map((n) => {
+                    const on = isOn(path, n.href);
+                    return (
+                      <Link key={n.href} href={n.href} aria-current={on ? "page" : undefined} className={`group relative mx-2 flex items-center rounded-lg px-3 py-1.5 text-[13px] transition-colors ${on ? "bg-accent/20 text-ink" : "text-dim hover:bg-raised/50 hover:text-ink"}`}>
+                        <span className={`mr-2.5 h-1.5 w-1.5 rounded-full transition-all ${on ? "bg-accent shadow-[0_0_10px_rgb(139_124_255)]" : "bg-line group-hover:bg-dim"}`} />
+                        {n.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              ))}
             </nav>
-            <div className="border-t border-line px-4 py-3 text-[10.5px] leading-relaxed text-faint">
-              Research and paper trading only. Not investment advice. This platform cannot place real orders.
-            </div>
+            <div className="border-t border-line/40 px-5 py-3 text-[11px] leading-relaxed text-faint">Research and tracking only. Not investment advice. This platform cannot place orders.</div>
           </aside>
           <div className="min-w-0 flex-1">
             <StatusBar />
-            <nav className="flex gap-1 overflow-x-auto border-b border-line px-3 py-2 md:hidden">
-              {NAV.map((n) => (
-                <Link key={n.href} href={n.href} className="whitespace-nowrap rounded px-2 py-1 text-[11.5px] text-dim hover:text-accent">
+            <nav className="flex gap-1 overflow-x-auto border-b border-line/40 bg-bg/60 px-3 py-2 backdrop-blur md:hidden" aria-label="Sections">
+              {FLAT.map((n) => (
+                <Link key={n.href} href={n.href} aria-current={isOn(path, n.href) ? "page" : undefined} className={`whitespace-nowrap rounded-lg px-2.5 py-1 text-[12px] ${isOn(path, n.href) ? "bg-accent/25 text-ink" : "text-dim"}`}>
                   {n.label}
                 </Link>
               ))}
             </nav>
-            <main className="mx-auto max-w-[1500px] px-5 py-5">{children}</main>
+            <main key={path} className="route-enter mx-auto max-w-[1560px] px-4 py-5 sm:px-5">
+              {children}
+            </main>
           </div>
         </div>
       </LiveProvider>

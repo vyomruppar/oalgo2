@@ -21,17 +21,17 @@ function Detail({ a }: { a: J }) {
   return (
     <div className="grid gap-x-8 gap-y-3 text-[12px] md:grid-cols-3">
       <div>
-        <div className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-faint">Supporting evidence</div>
+        <div className="mb-1 sub">Supporting evidence</div>
         {p.reasons?.length ? <ul className="list-disc space-y-0.5 pl-4 text-dim">{p.reasons.map((r: string) => <li key={r}>{r}</li>)}</ul> : <p className="text-faint">{a.message}</p>}
         {p.red_flags?.length > 0 && <ul className="mt-2 list-disc space-y-0.5 pl-4 text-down">{p.red_flags.map((r: J) => <li key={r.code}>{r.text}</li>)}</ul>}
       </div>
       <div>
-        <div className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-faint">Entry and exit conditions</div>
+        <div className="mb-1 sub">Entry and exit conditions</div>
         {p.entry_conditions?.length ? <ul className="list-disc space-y-0.5 pl-4 text-dim">{p.entry_conditions.map((r: string) => <li key={r}>{r}</li>)}</ul> : <p className="text-faint">No entry suggested.</p>}
         {p.exit_conditions?.length > 0 && <ul className="mt-2 list-disc space-y-0.5 pl-4 text-dim">{p.exit_conditions.map((r: string) => <li key={r}>{r}</li>)}</ul>}
       </div>
       <div>
-        <div className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-faint">Risk assessment</div>
+        <div className="mb-1 sub">Risk assessment</div>
         {p.risk ? (
           <KV rows={[
             ["Volatility, 1 year", fmtPct(p.risk.volatility_1y, 0)],
@@ -83,7 +83,7 @@ export default function Alerts() {
       />
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <Seg options={KINDS} value={kind} onChange={setKind} labels={KIND_LABEL} />
-        <label className="flex cursor-pointer items-center gap-1.5 text-[12px] text-dim"><input type="checkbox" checked={unread} onChange={(e) => setUnread(e.target.checked)} className="accent-[#d6a85c]" /> Unread only</label>
+        <label className="flex cursor-pointer items-center gap-1.5 text-[12px] text-dim"><input type="checkbox" checked={unread} onChange={(e) => setUnread(e.target.checked)} className="accent-[#8b7cff]" /> Unread only</label>
         <span className="note ml-auto">{data ? `${data.unread} unread` : ""} · e-mail delivery {cfg.data?.email_configured ? "configured" : "not configured (set OALGO_SMTP_* to enable)"}</span>
       </div>
       <Card pad={false}>

@@ -41,9 +41,9 @@ describe("labels", () => {
     expect(signClass(0.1)).toBe("text-up");
     expect(signClass(-0.1)).toBe("text-down");
     expect(signClass(null)).toBe("text-dim");
-    expect(scoreColor(100)).toBe("rgb(74 190 142)");
-    expect(scoreColor(0)).toBe("rgb(232 104 104)");
-    expect(scoreColor(null)).toBe("rgb(98 107 121)");
+    expect(scoreColor(100)).toBe("rgb(61 242 196)");
+    expect(scoreColor(0)).toBe("rgb(255 92 122)");
+    expect(scoreColor(null)).toBe("rgb(108 117 170)");
   });
   it("relative time", () => {
     const now = Date.parse("2026-11-16T12:00:00Z");

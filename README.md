@@ -20,6 +20,12 @@ make backend
 make frontend
 ```
 
+For AI headline sentiment, also install the free local FinBERT model once (about 1.5 GB with PyTorch; without it a built-in word list is used and labelled as such):
+
+```bash
+make install-ai
+```
+
 Open http://localhost:3000 and press **Run scan now**. The first scan of 300 stocks takes about ten minutes (the free data sources are rate limited); later scans reuse the cache. After that, a scan runs automatically on weekdays at 22:30 UTC while the backend is running.
 
 Optional settings go in `backend/.env` (see `.env.example`). Setting `OALGO_SEC_USER_AGENT` to your own contact string is recommended, as the SEC asks automated clients to identify themselves.
@@ -38,7 +44,9 @@ Optional settings go in `backend/.env` (see `.env.example`). Setting `OALGO_SEC_
 | Risk | VaR and CVaR, beta, risk contributions, concentration, sector exposure, correlation, stop and gap scenarios, position sizing |
 | Paper trading | Hypothetical orders filled at the next open with costs; dividends and splits; P&L and equity curve |
 | Alerts | New and changed signals, score moves, risk flags, exit conditions, unusual volume or volatility, filings, regime changes, provider failures; deduplicated; in-app, desktop, optional e-mail |
-| Dashboard | Overview, Market, Strategies & Factors, Model Monitor, Stock Explorer, Portfolio & Risk, Alerts, Settings; live updates over Server-Sent Events with polling fallback |
+| My portfolio | Record the stocks you own (or import a CSV) and track value over time against the same dollars in SPY, gains, allocation, risk, signals and news. Tracking only: it never places an order |
+| News and sentiment | Recent headlines for your holdings and for buy and watchlist names, scored for tone by a local FinBERT model (or a word list), with a recency- and relevance-weighted average per stock |
+| Dashboard | Command (an interactive star map of the scanned universe with your holdings ringed), My portfolio, Market, a Quant lab split into Factors, Momentum and trend, Mean reversion, Volatility and regime, Machine learning and Validation, Stock explorer, News, Alerts, Scans and data, Settings; live updates over Server-Sent Events with polling fallback |
 
 ## What to know before trusting a number
 
@@ -46,6 +54,7 @@ Optional settings go in `backend/.env` (see `.env.example`). Setting `OALGO_SEC_
 - Backtests carry **survivorship bias**: the free price source has no delisted companies and the universe is today's liquid stocks. Results are judged against the equal-weight universe for that reason.
 - In the runs made during development, **most strategies did not beat the equal-weight universe after costs, and no machine-learning model passed validation**. The dashboard reports that as it is.
 - A score ranks stocks. It is not a probability of profit.
+- Sentiment reads **headlines only** and has no test history, so its weight in the score is zero unless you change it.
 
 Full detail: [`docs/limitations.md`](docs/limitations.md).
 
@@ -65,7 +74,7 @@ data/           Created at runtime: SQLite database, price and fundamentals file
 make test
 ```
 
-Backend: 107 tests covering every indicator and metric against hand calculations, point-in-time and look-ahead checks, the backtester's fill timing and costs, validation statistics, the paper ledger, alert deduplication, parsers on recorded real responses, and the API. Frontend: type check and formatting tests.
+Backend: 122 tests covering every indicator and metric against hand calculations, point-in-time and look-ahead checks, the backtester's fill timing and costs, validation statistics, the paper ledger, the holdings tracker, news parsing and sentiment, alert deduplication, parsers on recorded real responses, and the API. Frontend: type check, formatting tests and star-map layout tests.
 
 ## Data sources
 

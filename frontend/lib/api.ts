@@ -25,7 +25,7 @@ async function parse(r: Response): Promise<J> {
 
 export const fetcher = (path: string): Promise<J> => fetch(`${API_URL}${path}`, { cache: "no-store" }).then(parse);
 
-export function send(method: "POST" | "PUT", path: string, body?: unknown): Promise<J> {
+export function send(method: "POST" | "PUT" | "DELETE", path: string, body?: unknown): Promise<J> {
   return fetch(`${API_URL}${path}`, {
     method,
     headers: body === undefined ? undefined : { "Content-Type": "application/json" },

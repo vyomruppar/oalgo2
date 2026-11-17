@@ -29,6 +29,8 @@ Network access to the seven hosts listed below. No API keys.
 | Nasdaq Trader symbol directory | `www.nasdaqtrader.com` | NYSE/NASDAQ listing verification | Public daily files. Current listings only. |
 | SEC EDGAR | `data.sec.gov`, `www.sec.gov` | Fundamentals, filings, filing dates, SIC codes | Public domain. Fair-access policy: at most 10 requests per second and a declared User-Agent (set `OALGO_SEC_USER_AGENT`). |
 | Yahoo Finance chart endpoint | `query2.finance.yahoo.com` | Daily prices, dividends, splits, index levels | Unofficial and undocumented. Personal research use. Rate limited. No delisted securities. |
+| Yahoo Finance search endpoint | `query2.finance.yahoo.com` | News headlines for sentiment | Unofficial. Headlines only, no article text. |
+| Hugging Face (one-time, optional) | `huggingface.co` | Downloading the FinBERT model weights | Only for `make install-ai`. The model then runs locally; no text is sent anywhere. |
 | Kenneth R. French Data Library | `mba.tuck.dartmouth.edu` | Risk-free rate, factor returns | Free for research; cite the library. |
 | FRED | `fred.stlouisfed.org` | Treasury yields | Public CSV export; individual series may carry their own terms. |
 

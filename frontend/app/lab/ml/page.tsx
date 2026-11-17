@@ -68,7 +68,7 @@ export default function ModelMonitor() {
   if (data.status !== "ok")
     return (
       <>
-        <PageTitle title="Model Monitor" />
+        <PageTitle title="Machine learning" />
         <Card>
           <Empty title={data.status === "insufficient_history" ? "Not enough history to train" : "No model has been trained yet"}>
             {data.detail ?? "Models are trained with walk-forward validation as part of a scan. Nothing is shown here until real results exist."}
@@ -82,7 +82,7 @@ export default function ModelMonitor() {
 
   return (
     <>
-      <PageTitle title="Model Monitor" sub={`Target: ${data.target}. Expanding-window walk-forward, retrained every 12 months with a one-month purge.`} right={<Seg options={names as string[]} value={model} onChange={setModel} labels={Object.fromEntries(names.map((n) => [n, titleCase(n)]))} />} />
+      <PageTitle title="Machine learning" sub={`Target: ${data.target}. Expanding-window walk-forward, retrained every 12 months with a one-month purge.`} right={<Seg options={names as string[]} value={model} onChange={setModel} labels={Object.fromEntries(names.map((n) => [n, titleCase(n)]))} />} />
       <Banner>
         {data.active_model ? (
           <>The <strong>{titleCase(data.active_model)}</strong> model passed out-of-sample validation and contributes to scores where its weight is above zero.</>

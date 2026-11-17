@@ -87,7 +87,7 @@ export default function Market() {
       tooltip: { trigger: "item", formatter: (p: J) => `${rows[p.value[1]].sector} · ${HORIZONS[p.value[0]]}: ${p.value[2] == null ? "n/a" : `${p.value[2]}%`}` },
       xAxis: catAxis([...HORIZONS], { position: "top", axisLine: { show: false } }),
       yAxis: catAxis(rows.map((s) => `${s.sector} (${s.n})`), { inverse: true, axisLine: { show: false } }),
-      visualMap: { show: false, min: -lim, max: lim, inRange: { color: ["#b84c4c", "#5a3336", "#1b2027", "#27503f", "#3fae80"] } },
+      visualMap: { show: false, min: -lim, max: lim, inRange: { color: ["#d0456b", "#5a2748", "#11163c", "#17605a", "#2fd0aa"] } },
       series: [{ type: "heatmap", data, label: { show: true, color: C.ink, fontSize: 10.5, formatter: (p: J) => (p.value[2] == null ? "" : `${p.value[2] > 0 ? "+" : ""}${p.value[2].toFixed(1)}`) }, itemStyle: { borderColor: C.panel, borderWidth: 2 } }],
     });
   }, [sectors, rs]);

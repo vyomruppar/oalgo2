@@ -2,21 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Observatory theme. Colours are stored as RGB triplets so Tailwind opacity modifiers work. */
 :root {
-  --bg: 11 13 16;
-  --panel: 17 20 25;
-  --raised: 24 28 35;
-  --line: 38 44 54;
-  --ink: 226 230 236;
-  --dim: 148 157 170;
-  --faint: 98 107 121;
-  --accent: 214 168 92;
-  --up: 74 190 142;
-  --down: 232 104 104;
-  --warn: 226 176 76;
-  /* System stacks only: the dashboard must work offline and never fetch fonts from a third party. */
-  --font-sans: "Inter", "IBM Plex Sans", "Segoe UI", "Helvetica Neue", Arial;
-  --font-mono: "JetBrains Mono", "IBM Plex Mono", "SF Mono", Menlo, Consolas;
+  --bg: 6 8 24; /* void */
+  --panel: 14 18 48; /* deep field */
+  --raised: 24 29 72;
+  --line: 52 60 122;
+  --ink: 232 235 255; /* starlight */
+  --dim: 160 168 214;
+  --faint: 108 117 170;
+  --accent: 139 124 255; /* plasma */
+  --up: 61 242 196; /* aurora */
+  --down: 255 92 122; /* red dwarf */
+  --warn: 255 196 107; /* solar */
+  --font-sans: "Hanken Grotesk Variable", "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Unbounded", "Hanken Grotesk Variable", ui-sans-serif, sans-serif;
 }
 
 html,
@@ -26,7 +26,8 @@ body {
 }
 
 body {
-  font-feature-settings: "tnum" 1;
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 1, "ss01" 1;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -35,47 +36,98 @@ html {
   scrollbar-color: rgb(var(--line)) transparent;
 }
 
+::selection {
+  background: rgb(var(--accent) / 0.45);
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--accent));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 @layer components {
+  /* Panels come in three ranks: glass (primary), flat (tables), and bare (the star map). */
   .card {
-    @apply rounded-md border border-line bg-panel;
+    @apply relative rounded-xl border border-line/50 bg-panel/60 backdrop-blur-md;
+    box-shadow: inset 0 1px 0 rgb(var(--ink) / 0.04), 0 18px 50px -30px rgb(0 0 0 / 0.8);
   }
   .card-h {
-    @apply flex items-center justify-between gap-3 border-b border-line px-4 py-2.5;
+    @apply flex items-center justify-between gap-3 border-b border-line/40 px-4 py-3;
   }
   .card-t {
-    @apply text-[11px] font-semibold uppercase tracking-[0.12em] text-dim;
+    @apply text-[13px] font-semibold text-ink;
   }
   .num {
-    @apply font-mono tabular-nums;
+    font-variant-numeric: tabular-nums;
+  }
+  .display {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+  }
+  .sub {
+    @apply text-[11.5px] font-semibold text-faint;
   }
   .th {
-    @apply whitespace-nowrap px-3 py-2 text-left text-[10.5px] font-semibold uppercase tracking-[0.1em] text-faint;
+    @apply whitespace-nowrap px-3 py-2 text-left text-[11.5px] font-medium text-faint;
   }
   .td {
     @apply whitespace-nowrap px-3 py-1.5 text-[12.5px];
   }
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded border border-line bg-raised px-3 py-1.5 text-xs font-medium text-ink transition-colors hover:border-accent/60 hover:text-accent disabled:cursor-not-allowed disabled:opacity-40;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg border border-line/70 bg-raised/60 px-3 py-1.5 text-xs font-medium text-ink transition-colors hover:border-accent hover:bg-accent/15 disabled:cursor-not-allowed disabled:opacity-40;
   }
   .btn-primary {
-    @apply border-accent/50 bg-accent/10 text-accent hover:bg-accent/20;
+    @apply border-accent/70 bg-accent/25 text-ink hover:bg-accent/40;
   }
   .input {
-    @apply rounded border border-line bg-bg px-2.5 py-1.5 text-xs text-ink outline-none placeholder:text-faint focus:border-accent/60;
+    @apply rounded-lg border border-line/70 bg-bg/70 px-2.5 py-1.5 text-xs text-ink outline-none placeholder:text-faint focus:border-accent;
   }
   .chip {
-    @apply inline-flex items-center rounded-sm border px-1.5 py-[1px] text-[10.5px] font-semibold uppercase tracking-wider;
+    @apply inline-flex items-center rounded-full border px-2 py-[1px] text-[11px] font-semibold;
   }
   .seg {
-    @apply inline-flex overflow-hidden rounded border border-line;
+    @apply inline-flex overflow-hidden rounded-lg border border-line/70 bg-bg/40;
   }
   .seg > button {
-    @apply border-r border-line px-2.5 py-1 text-[11px] font-medium text-dim last:border-r-0 hover:text-ink;
+    @apply border-r border-line/50 px-2.5 py-1 text-[11.5px] font-medium text-dim transition-colors last:border-r-0 hover:text-ink;
   }
   .seg > button[data-on="true"] {
-    @apply bg-raised text-accent;
+    @apply bg-accent/30 text-ink;
   }
   .note {
     @apply text-[11.5px] leading-relaxed text-faint;
+  }
+}
+
+/* Route change: content settles in once. Disabled for people who ask for less motion. */
+@keyframes settle {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.995);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+.route-enter {
+  animation: settle 420ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+@keyframes orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-enter {
+    animation: none;
+  }
+  * {
+    scroll-behavior: auto !important;
   }
 }

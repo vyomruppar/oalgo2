@@ -7,8 +7,8 @@ import { C } from "./EChart";
 export type Overlay = { key: string; label: string; color: string; dashed?: boolean };
 
 export const OVERLAYS: Overlay[] = [
-  { key: "sma_20", label: "SMA 20", color: "#6ea8d8" },
-  { key: "sma_50", label: "SMA 50", color: "#d6a85c" },
+  { key: "sma_20", label: "SMA 20", color: "#5ec8ff" },
+  { key: "sma_50", label: "SMA 50", color: "#8b7cff" },
   { key: "sma_200", label: "SMA 200", color: "#c586c0" },
   { key: "ema_12", label: "EMA 12", color: "#7fb8b0" },
   { key: "ema_26", label: "EMA 26", color: "#e8915a" },
@@ -38,7 +38,7 @@ export default function CandleChart({ dates, ohlcv, indicators, active, mode, he
     const chart: IChartApi = createChart(ref.current, {
       height,
       layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: C.dim, fontSize: 11 },
-      grid: { vertLines: { color: "rgba(38,44,54,0.5)" }, horzLines: { color: "rgba(38,44,54,0.5)" } },
+      grid: { vertLines: { color: "rgba(52,60,122,0.5)" }, horzLines: { color: "rgba(52,60,122,0.5)" } },
       rightPriceScale: { borderColor: C.line, scaleMargins: { top: 0.06, bottom: 0.24 } },
       timeScale: { borderColor: C.line, rightOffset: 4 },
       crosshair: { mode: CrosshairMode.Normal },
@@ -55,7 +55,7 @@ export default function CandleChart({ dates, ohlcv, indicators, active, mode, he
       );
     } else {
       const data = dates.flatMap((_, i) => (ohlcv.close[i] == null ? [] : [{ time: t(i), value: ohlcv.close[i] as number }]));
-      if (mode === "area") chart.addAreaSeries({ lineColor: C.accent, topColor: "rgba(214,168,92,0.25)", bottomColor: "rgba(214,168,92,0.0)", lineWidth: 2 }).setData(data);
+      if (mode === "area") chart.addAreaSeries({ lineColor: C.accent, topColor: "rgba(139,124,255,0.25)", bottomColor: "rgba(139,124,255,0.0)", lineWidth: 2 }).setData(data);
       else chart.addLineSeries({ color: C.accent, lineWidth: 2 }).setData(data);
     }
 
@@ -66,7 +66,7 @@ export default function CandleChart({ dates, ohlcv, indicators, active, mode, he
         const v = ohlcv.volume[i];
         if (v == null) return [];
         const up = (ohlcv.close[i] ?? 0) >= (ohlcv.open[i] ?? 0);
-        return [{ time: t(i), value: v, color: up ? "rgba(74,190,142,0.35)" : "rgba(232,104,104,0.35)" }];
+        return [{ time: t(i), value: v, color: up ? "rgba(61,242,196,0.35)" : "rgba(255,92,122,0.35)" }];
       }),
     );
 

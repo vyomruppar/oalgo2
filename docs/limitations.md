@@ -14,8 +14,24 @@ A research and paper-trading workstation. It ranks and explains; it does not pre
 - **Fundamentals** come from us-gaap XBRL only. IFRS filers and companies with non-standard tags have gaps; they fail the fundamentals screen rather than being scored on partial data.
 - **Share counts.** Multi-class companies can report one class only. Where price times shares is implausibly small (under 1% of both revenue and assets), market cap is treated as unknown and the stock is not ranked. Berkshire Hathaway class B is an example.
 - **Sectors** are grouped from SEC SIC codes and do not match GICS.
-- **No analyst estimates, earnings calendar, news, transcripts, insider or institutional data.** Next-report dates are estimates.
+- **No analyst estimates, earnings calendar, article text, transcripts, insider or institutional data.** Next-report dates are estimates. News is headlines only.
 - **The price source is unofficial** and may be throttled or changed.
+
+## Holdings tracker
+
+- Tracking only. Recording a holding never creates an order, real or paper.
+- Only securities in the NYSE/NASDAQ directory can be tracked. NYSE Arca ETFs such as SPY, mutual funds, options, bonds and cash are not supported.
+- Purchases are tracked; sales, cash balances and fees are not. To record a sale, edit or remove the lot.
+- Value history uses split-adjusted closes. Dividends are added as cash, not reinvested. The benchmark puts the same dollars into SPY on each purchase date.
+- A holding outside the scanned set is valued but has no score until the next scan picks it up.
+
+## News and sentiment
+
+- Headlines come from an unofficial Yahoo Finance endpoint. Only the headline is read, never the article.
+- A search for a ticker also returns market round-ups that merely mention it. These get a low relevance weight but still appear, marked "mentions only".
+- FinBERT is a general finance-tone model. It can misread sarcasm, questions and headlines about a different company. The word-list fallback is cruder and is not AI.
+- Sentiment has no backtest. Its weight in the research score is zero by default and it is never shown as a forecast.
+- Headlines are kept for 21 days.
 
 ## Research
 

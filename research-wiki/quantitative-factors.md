@@ -82,6 +82,7 @@ Strategy classification follows the evidence: multifactor, value, momentum, qual
 | Factor IC, correlation, per-factor backtests | Implemented | `jobs/pipeline.py`, `backtest/strategies.py` |
 | CAPM alpha/beta | Implemented | `backtest/metrics.py` |
 | FF3/FF5/Carhart loadings per stock, APT | Deferred |
+| News headline sentiment (FinBERT or word list) as a score component | Implemented, weight 0 by default: no test history | `research/sentiment.py` |
 | Analyst revisions, QMJ, pairs/cointegration, Kalman | Deferred |
 
 ## 10. Associated tests

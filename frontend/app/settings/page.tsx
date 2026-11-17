@@ -84,7 +84,7 @@ export default function Settings() {
             })}
             <label className="flex items-center justify-between gap-3 text-[12.5px]">
               <span className="text-dim">Require recent SEC fundamentals</span>
-              <input type="checkbox" checked={screen.require_fundamentals} onChange={(e) => setScreen({ ...screen, require_fundamentals: e.target.checked })} className="accent-[#d6a85c]" />
+              <input type="checkbox" checked={screen.require_fundamentals} onChange={(e) => setScreen({ ...screen, require_fundamentals: e.target.checked })} className="accent-[#8b7cff]" />
             </label>
             <div>
               <div className="mb-1.5 text-[12.5px] text-dim">Excluded sectors</div>
@@ -117,7 +117,7 @@ export default function Settings() {
                     <label htmlFor={`w-${k}`} className="text-dim" title={data.component_labels[k]}>{k === "ml" ? "Machine learning" : titleCase(k)}</label>
                     <span className="num">{fmtNum(w, 0)} <span className="text-faint">({total > 0 ? ((100 * w) / total).toFixed(0) : 0}%)</span></span>
                   </div>
-                  <input id={`w-${k}`} type="range" min={0} max={40} step={1} value={w} onChange={(e) => setScore({ ...score, weights: { ...score.weights, [k]: Number(e.target.value) } })} className="w-full accent-[#d6a85c]" />
+                  <input id={`w-${k}`} type="range" min={0} max={40} step={1} value={w} onChange={(e) => setScore({ ...score, weights: { ...score.weights, [k]: Number(e.target.value) } })} className="w-full accent-[#8b7cff]" />
                 </div>
               );
             })}

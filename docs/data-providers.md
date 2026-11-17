@@ -9,6 +9,7 @@ What the platform uses today, what each source cannot do, and what a paid provid
 | Nasdaq Trader symbol directory | Listings, ETF and test-issue flags, Nasdaq financial-status flag | NASDAQ, NYSE and other US venues (only NASDAQ and NYSE are kept) | Current listings only | Daily file | None stated; fetched at most twice a day | Public files |
 | SEC EDGAR (`data.sec.gov`) | XBRL company facts, filing index, SIC code | Every SEC registrant | XBRL from about 2009 | As filed | 10 requests per second; declared User-Agent | Public domain |
 | Yahoo Finance chart endpoint | Daily OHLCV, dividends, splits, index levels | US listed, currently trading | Decades for most stocks | End of day; latest bar delayed and partial during the session | Undocumented throttling; the platform uses about 2 requests per second | Unofficial; personal research use |
+| Yahoo Finance search endpoint | News headlines (title, publisher, time, link) | US listed | Recent days only | Minutes to hours | Same host and throttling as prices | Unofficial; personal research use |
 | Kenneth French Data Library | Daily factor returns, risk-free rate | US market aggregates | From 1926 | Monthly update, about two months behind | None | Free for research with attribution |
 | FRED | Treasury yields | Macro | Decades | Daily, one-day lag | None on CSV export | Public; series-specific terms |
 

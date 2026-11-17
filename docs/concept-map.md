@@ -77,6 +77,17 @@ Where each concept from the research brief lives in the platform. **Built** mean
 | Paper ledger with dividends and splits | Built | `paper/ledger.py` |
 | Real-money execution | Never | |
 
+## Holdings, news and sentiment
+
+| Concept | Status | Code |
+|---|---|---|
+| Real-holdings tracker (lots, CSV import, split-aware valuation, value history, benchmark) | Built | `backend/app/portfolio/holdings.py` |
+| Holdings risk (VaR, contributions, correlation, scenarios) | Built | `risk/portfolio.py` via `/api/holdings/risk` |
+| News headlines with relevance weighting | Built | `data/news.py`, `research/news_service.py` |
+| Sentiment: FinBERT (optional, local) and word-list fallback | Built | `research/sentiment.py` |
+| Sentiment in the research score | Built, weight 0 by default (needs validation) | `research/scoring.py` |
+| Sentiment backtest, article text, transcripts | Deferred | |
+
 ## Automation and interface
 
 | Concept | Status | Code |
@@ -86,4 +97,4 @@ Where each concept from the research brief lives in the platform. **Built** mean
 | Alerts with deduplication | Built | `alerts/engine.py` |
 | In-app and desktop notifications; optional e-mail | Built (e-mail untested against a live SMTP server) | `alerts/engine.py`, `frontend/lib/live.tsx` |
 | Messaging integrations | Deferred | |
-| Seven dashboard sections plus Settings | Built | `frontend/app/` |
+| Command star map, My portfolio, Market, six Quant lab pages, Explorer, News, Alerts, Scans and data, Settings | Built | `frontend/app/` |

@@ -56,7 +56,7 @@ export default function StockExplorer() {
       </div>
       <Card pad={false}>
         {error && !data ? <ErrorBox error={error} /> : !data ? <Loading rows={8} /> : data.items.length === 0 ? (
-          <Empty title="No stocks match">{all.data?.total ? "Change the filters above." : "No scan has completed yet. Start one from the Overview page."}</Empty>
+          <Empty title="No stocks match">{all.data?.total ? "Change the filters above." : "No scan has completed yet. Start one from the Command page."}</Empty>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">

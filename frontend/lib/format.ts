@@ -62,7 +62,7 @@ export function signalStyle(signal: string | null | undefined): { label: string;
     case "SELL":
       return { label: "Sell", cls: "border-down/50 text-down" };
     case "WATCHLIST":
-      return { label: "Watchlist", cls: "border-accent/50 text-accent" };
+      return { label: "Watchlist", cls: "border-warn/50 text-warn" };
     case "HOLD":
       return { label: "Hold", cls: "border-line text-dim" };
     case "NO_ACTION":
@@ -75,7 +75,7 @@ export function signalStyle(signal: string | null | undefined): { label: string;
 export function regimeLabel(r: string | null | undefined): { label: string; cls: string } {
   if (r === "risk_on") return { label: "Risk-on", cls: "text-up" };
   if (r === "risk_off") return { label: "Risk-off", cls: "text-down" };
-  if (r === "neutral") return { label: "Neutral", cls: "text-accent" };
+  if (r === "neutral") return { label: "Neutral", cls: "text-warn" };
   return { label: "Unknown", cls: "text-faint" };
 }
 
@@ -85,11 +85,11 @@ export function titleCase(s: string): string {
 
 /** Score colour ramp: low scores red, mid neutral, high green. Returns an rgb() string. */
 export function scoreColor(v: Num): string {
-  if (!isNum(v)) return "rgb(98 107 121)";
+  if (!isNum(v)) return "rgb(108 117 170)";
   const t = Math.max(0, Math.min(100, v)) / 100;
-  const lo = [232, 104, 104];
-  const mid = [148, 157, 170];
-  const hi = [74, 190, 142];
+  const lo = [255, 92, 122];
+  const mid = [160, 168, 214];
+  const hi = [61, 242, 196];
   const [a, b, k] = t < 0.5 ? [lo, mid, t / 0.5] : [mid, hi, (t - 0.5) / 0.5];
   const c = a.map((x, i) => Math.round(x + (b[i] - x) * k));
   return `rgb(${c[0]} ${c[1]} ${c[2]})`;

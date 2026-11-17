@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import CandleChart, { OVERLAYS } from "@/components/CandleChart";
 import EChart, { C, baseOption, catAxis, timeAxis, valueAxis, zoom } from "@/components/EChart";
 import { Banner, Card, Empty, ErrorBox, KV, Loading, Seg, SignalChip, Tag, useApi } from "@/components/ui";
+import NewsFeed from "@/components/NewsFeed";
 import { ApiError, send, type J } from "@/lib/api";
 import { fmtCompact, fmtDateTime, fmtMoney, fmtNum, fmtPct, scoreColor, signClass, titleCase } from "@/lib/format";
 
@@ -71,7 +72,7 @@ export default function StockPage() {
     const line = (name: string, key: string, color?: string) => ({ name, type: "line" as const, showSymbol: false, lineStyle: { width: 1.3 }, color, data: p.dates.map((d: string, i: number) => [d, ind[key]?.[i] ?? null]) });
     let series: J[] = [line(SUB_LABEL[sub], sub, C.accent)];
     let marks: number[] = [];
-    if (sub === "macd") series = [line("MACD", "macd", C.accent), line("Signal", "macd_signal", "#6ea8d8"), { name: "Histogram", type: "bar", data: p.dates.map((d: string, i: number) => ({ value: [d, ind.macd_hist?.[i] ?? null], itemStyle: { color: (ind.macd_hist?.[i] ?? 0) >= 0 ? C.up : C.down, opacity: 0.6 } })) }];
+    if (sub === "macd") series = [line("MACD", "macd", C.accent), line("Signal", "macd_signal", "#5ec8ff"), { name: "Histogram", type: "bar", data: p.dates.map((d: string, i: number) => ({ value: [d, ind.macd_hist?.[i] ?? null], itemStyle: { color: (ind.macd_hist?.[i] ?? 0) >= 0 ? C.up : C.down, opacity: 0.6 } })) }];
     if (sub === "rsi_14") marks = [30, 70];
     if (sub === "mfi_14") marks = [20, 80];
     if (marks.length) series[0].markLine = { symbol: "none", silent: true, lineStyle: { color: C.faint, type: "dashed" }, label: { color: C.faint, fontSize: 10 }, data: marks.map((y) => ({ yAxis: y })) };
@@ -211,23 +212,23 @@ export default function StockPage() {
               <Card title="Why this signal">
                 <div className="space-y-3 text-[12.5px] leading-relaxed">
                   <div>
-                    <div className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-up">Supporting</div>
+                    <div className="mb-1 sub !text-up">Supporting</div>
                     <ul className="list-disc space-y-0.5 pl-4">{res.reasons.map((r: string) => <li key={r}>{r}</li>)}</ul>
                   </div>
                   {res.weaknesses?.length > 0 && (
                     <div>
-                      <div className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-down">Against</div>
+                      <div className="mb-1 sub !text-down">Against</div>
                       <ul className="list-disc space-y-0.5 pl-4 text-dim">{res.weaknesses.map((r: string) => <li key={r}>{r}</li>)}</ul>
                     </div>
                   )}
                   {res.gates?.length > 0 && (
                     <div>
-                      <div className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-accent">Why not a stronger signal</div>
+                      <div className="mb-1 sub !text-accent">Why not a stronger signal</div>
                       <ul className="list-disc space-y-0.5 pl-4 text-dim">{res.gates.map((r: string) => <li key={r}>{r}</li>)}</ul>
                     </div>
                   )}
                   <div>
-                    <div className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-faint">Technical checks</div>
+                    <div className="mb-1 sub">Technical checks</div>
                     <ul className="space-y-0.5">
                       {(res.technical_checks ?? []).map((c: J) => (
                         <li key={c.name} className="flex justify-between gap-3"><span className={c.passed == null ? "text-faint" : c.passed ? "text-ink" : "text-dim"}>{c.passed == null ? "n/a" : c.passed ? "Yes" : "No"} · {c.name}</span><span className="num text-[11px] text-faint">{c.detail}</span></li>
@@ -240,17 +241,17 @@ export default function StockPage() {
                 <div className="space-y-3 text-[12.5px] leading-relaxed">
                   {[["Entry conditions", res.entry_conditions, "No entry is suggested for this signal."], ["Exit conditions", res.exit_conditions, ""], ["What would invalidate the view", res.invalidation, ""]].map(([t, list, empty]) => (
                     <div key={t as string}>
-                      <div className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-faint">{t as string}</div>
+                      <div className="mb-1 sub">{t as string}</div>
                       {(list as string[])?.length ? <ul className="list-disc space-y-0.5 pl-4">{(list as string[]).map((r) => <li key={r}>{r}</li>)}</ul> : <p className="text-faint">{empty as string}</p>}
                     </div>
                   ))}
                   <div>
-                    <div className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-faint">Expected holding period</div>
+                    <div className="mb-1 sub">Expected holding period</div>
                     <p>{res.holding_period}</p>
                   </div>
                   {(res.upcoming_events ?? []).length > 0 && (
                     <div>
-                      <div className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-faint">Upcoming events</div>
+                      <div className="mb-1 sub">Upcoming events</div>
                       <KV rows={(res.upcoming_events ?? []).map((e: J): [React.ReactNode, React.ReactNode] => [e.type, <span key={e.date} title={e.basis}>{e.date}</span>])} />
                       <p className="note mt-1">Estimated from last year&apos;s filing date; not a confirmed date.</p>
                     </div>
@@ -269,7 +270,7 @@ export default function StockPage() {
                 ]} />
                 {res.scenarios && (
                   <>
-                    <div className="mt-3 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-faint">Price range over the holding period</div>
+                    <div className="mt-3 sub">Price range over the holding period</div>
                     <div className="mt-1.5 grid grid-cols-4 gap-1 text-center text-[11.5px]">
                       {[["-2σ", res.scenarios.two_sigma_down, "text-down"], ["-1σ", res.scenarios.one_sigma_down, "text-down"], ["+1σ", res.scenarios.one_sigma_up, "text-up"], ["+2σ", res.scenarios.two_sigma_up, "text-up"]].map(([l, v, c]) => (
                         <div key={l as string} className="rounded border border-line py-1.5"><div className="text-faint">{l as string}</div><div className={`num ${c}`}>{fmtMoney(v as number)}</div></div>
@@ -280,7 +281,7 @@ export default function StockPage() {
                 )}
                 {res.strategy_performance && (
                   <>
-                    <div className="mt-3 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-faint">Historical strategy performance <Tag tone="warn">Backtested</Tag></div>
+                    <div className="mt-3 sub">Historical strategy performance <Tag tone="warn">Backtested</Tag></div>
                     <div className="mt-1.5">
                       <KV rows={[
                         [res.strategy_performance.strategy, `${fmtPct(res.strategy_performance.cagr)} CAGR · ${fmtNum(res.strategy_performance.sharpe)} Sharpe`],
@@ -328,10 +329,10 @@ export default function StockPage() {
           {res.score != null && (
             <Card title="Fundamentals and factor inputs" className="mt-3" right={<span className="text-[11px] text-faint">trailing twelve months unless stated</span>}>
               <div className="grid gap-x-10 gap-y-4 md:grid-cols-2 xl:grid-cols-4">
-                <div><div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-faint">Valuation</div><KV rows={[["Market cap", fmtCompact(f.market_cap, "$")], ["Enterprise value", fmtCompact(f.enterprise_value, "$")], ["P/E", fmtNum(f.pe, 1)], ["EV/EBITDA", fmtNum(f.ev_ebitda, 1)], ["P/B", fmtNum(f.pb, 1)], ["P/S", fmtNum(f.ps, 1)], ["EBIT / EV", fmtPct(f.ebit_ev)], ["FCF yield", fmtPct(f.fcf_yield)], ["Shareholder yield", fmtPct(f.shareholder_yield)]]} /></div>
-                <div><div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-faint">Profitability and quality</div><KV rows={[["Revenue", fmtCompact(f.revenue_ttm, "$")], ["Net income", fmtCompact(f.net_income_ttm, "$")], ["Free cash flow", fmtCompact(f.fcf_ttm, "$")], ["Gross margin", fmtPct(f.gross_margin)], ["Operating margin", fmtPct(f.operating_margin)], ["ROIC", fmtPct(f.roic)], ["ROE", fmtPct(f.roe)], ["Gross profit / assets", fmtPct(f.gross_profitability)], ["Accruals / assets", fmtPct(f.accruals)]]} /></div>
-                <div><div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-faint">Growth and strength</div><KV rows={[["Revenue growth (FY)", fmtPct(f.revenue_growth, 1, true)], ["Revenue growth (quarter, y/y)", fmtPct(f.revenue_growth_q, 1, true)], ["Earnings growth (FY)", fmtPct(f.earnings_growth, 1, true)], ["Asset growth", fmtPct(f.asset_growth, 1, true)], ["Current ratio", fmtNum(f.current_ratio)], ["Debt / equity", fmtNum(f.debt_to_equity)], ["Net debt / EBITDA", fmtNum(f.net_debt_to_ebitda, 1)], ["Interest coverage", fmtNum(f.interest_coverage, 1)], ["Days since last filing", fmtNum(f.days_since_filing, 0)]]} /></div>
-                <div><div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-faint">Scores and momentum</div><KV rows={[["Piotroski F-score", f.piotroski == null ? "—" : `${fmtNum(f.piotroski, 0)} of ${fmtNum(f.piotroski_n, 0)}`], ["Altman Z-score", fmtNum(f.altman_z)], ["Earnings surprise (SUE)", fmtNum(f.sue)], ["Momentum 12-1 month", <span key="m" className={signClass(f.mom_12_1)}>{fmtPct(f.mom_12_1, 1, true)}</span>], ["Momentum 6-1 month", <span key="n" className={signClass(f.mom_6_1)}>{fmtPct(f.mom_6_1, 1, true)}</span>], ["Last month", <span key="o" className={signClass(f.ret_1m)}>{fmtPct(f.ret_1m, 1, true)}</span>], ["From 52-week high", fmtPct(f.dist_52w_high)], ...Object.entries(res.factor_z ?? {}).slice(0, 3).map(([k, v]): [React.ReactNode, React.ReactNode] => [`${titleCase(k)} z-score`, fmtNum(v as number)])]} /></div>
+                <div><div className="mb-1.5 sub">Valuation</div><KV rows={[["Market cap", fmtCompact(f.market_cap, "$")], ["Enterprise value", fmtCompact(f.enterprise_value, "$")], ["P/E", fmtNum(f.pe, 1)], ["EV/EBITDA", fmtNum(f.ev_ebitda, 1)], ["P/B", fmtNum(f.pb, 1)], ["P/S", fmtNum(f.ps, 1)], ["EBIT / EV", fmtPct(f.ebit_ev)], ["FCF yield", fmtPct(f.fcf_yield)], ["Shareholder yield", fmtPct(f.shareholder_yield)]]} /></div>
+                <div><div className="mb-1.5 sub">Profitability and quality</div><KV rows={[["Revenue", fmtCompact(f.revenue_ttm, "$")], ["Net income", fmtCompact(f.net_income_ttm, "$")], ["Free cash flow", fmtCompact(f.fcf_ttm, "$")], ["Gross margin", fmtPct(f.gross_margin)], ["Operating margin", fmtPct(f.operating_margin)], ["ROIC", fmtPct(f.roic)], ["ROE", fmtPct(f.roe)], ["Gross profit / assets", fmtPct(f.gross_profitability)], ["Accruals / assets", fmtPct(f.accruals)]]} /></div>
+                <div><div className="mb-1.5 sub">Growth and strength</div><KV rows={[["Revenue growth (FY)", fmtPct(f.revenue_growth, 1, true)], ["Revenue growth (quarter, y/y)", fmtPct(f.revenue_growth_q, 1, true)], ["Earnings growth (FY)", fmtPct(f.earnings_growth, 1, true)], ["Asset growth", fmtPct(f.asset_growth, 1, true)], ["Current ratio", fmtNum(f.current_ratio)], ["Debt / equity", fmtNum(f.debt_to_equity)], ["Net debt / EBITDA", fmtNum(f.net_debt_to_ebitda, 1)], ["Interest coverage", fmtNum(f.interest_coverage, 1)], ["Days since last filing", fmtNum(f.days_since_filing, 0)]]} /></div>
+                <div><div className="mb-1.5 sub">Scores and momentum</div><KV rows={[["Piotroski F-score", f.piotroski == null ? "—" : `${fmtNum(f.piotroski, 0)} of ${fmtNum(f.piotroski_n, 0)}`], ["Altman Z-score", fmtNum(f.altman_z)], ["Earnings surprise (SUE)", fmtNum(f.sue)], ["Momentum 12-1 month", <span key="m" className={signClass(f.mom_12_1)}>{fmtPct(f.mom_12_1, 1, true)}</span>], ["Momentum 6-1 month", <span key="n" className={signClass(f.mom_6_1)}>{fmtPct(f.mom_6_1, 1, true)}</span>], ["Last month", <span key="o" className={signClass(f.ret_1m)}>{fmtPct(f.ret_1m, 1, true)}</span>], ["From 52-week high", fmtPct(f.dist_52w_high)], ...Object.entries(res.factor_z ?? {}).slice(0, 3).map(([k, v]): [React.ReactNode, React.ReactNode] => [`${titleCase(k)} z-score`, fmtNum(v as number)])]} /></div>
               </div>
               <p className="note mt-3">Piotroski is shown out of the signals that could be evaluated (the share-dilution signal is not evaluated in this version). Altman Z is not computed for financial companies. Z-scores are sector-neutral for accounting factors.</p>
             </Card>
@@ -381,12 +382,18 @@ export default function StockPage() {
         </Card>
       </div>
 
+      {sec.eligible && (
+        <Card title={`News and sentiment for ${symbol}`} className="mt-3">
+          <NewsFeed symbol={symbol} limit={10} />
+        </Card>
+      )}
+
       {res?.sources?.length > 0 && (
         <Card title="Sources for this page" className="mt-3">
           <ul className="grid gap-x-8 gap-y-1 text-[12px] md:grid-cols-3">
             {res.sources.map((s: J) => <li key={s.name} className="flex justify-between gap-3"><span className="text-dim">{s.name}<span className="block text-[10.5px] text-faint">{s.use}</span></span><span className="num shrink-0">{(s.as_of ?? "").slice(0, 10)}</span></li>)}
           </ul>
-          <p className="note mt-2">Researched {fmtDateTime(res.as_of)} in scan {res.scan_id}. News and earnings-call transcripts are not available from the free data sources and are not shown.</p>
+          <p className="note mt-2">Researched {fmtDateTime(res.as_of)} in scan {res.scan_id}. Headlines come from an unofficial feed and are scored for tone only; earnings-call transcripts are not available.</p>
         </Card>
       )}
     </>

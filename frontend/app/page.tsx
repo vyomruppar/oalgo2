@@ -1,38 +1,34 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import EChart, { C, baseOption, catAxis, valueAxis } from "@/components/EChart";
-import { Card, Empty, ErrorBox, Loading, PageTitle, ScoreBar, SignalChip, Stat, SymbolLink, Tag, useApi } from "@/components/ui";
+import { useEffect, useState } from "react";
+import NewsFeed from "@/components/NewsFeed";
+import { HoldingTile, PortfolioTracker } from "@/components/Portfolio";
+import StarMap from "@/components/StarMap";
+import { Card, CountUp, Empty, ErrorBox, Loading, SignalChip, SymbolLink, Tag, useApi } from "@/components/ui";
 import { send, type J } from "@/lib/api";
-import { fmtCompact, fmtDateTime, fmtMoney, fmtNum, regimeLabel, timeAgo, titleCase } from "@/lib/format";
+import { fmtMoney, fmtPct, regimeLabel, signClass, timeAgo, titleCase } from "@/lib/format";
 import { stageLabel, useLive } from "@/lib/live";
 
-const SIGNAL_ORDER = ["STRONG BUY", "BUY", "WATCHLIST", "HOLD", "SELL", "NO_ACTION", "None"];
-const SIGNAL_COLOR: Record<string, string> = { "STRONG BUY": C.up, BUY: "#3d9a74", WATCHLIST: C.accent, HOLD: "#5b6472", SELL: C.down, NO_ACTION: "#3a414d", None: "#2c323c" };
-const RULE_LABEL: Record<string, string> = {
-  min_market_cap: "Market cap below minimum",
-  fundamentals_available: "No usable SEC fundamentals",
-  max_volatility: "Volatility above maximum",
-  min_price: "Price below minimum",
-  min_history: "Too little trading history",
-  min_adv_dollar: "Dollar volume below minimum",
-  sector: "Sector excluded",
-  price_data_quality: "Price data failed validation",
-  fresh_prices: "Stale prices",
-};
-
-export default function Overview() {
-  const { data, error, mutate } = useApi("/api/overview", 30000);
+export default function Command() {
+  const { data, error, mutate } = useApi("/api/dashboard", 60000);
   const { scan, events } = useLive();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 1023px)");
+    const on = () => setNarrow(mq.matches);
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
 
-  const run = async (fetch: boolean) => {
+  const runScan = async () => {
     setBusy(true);
     setMsg(null);
     try {
-      await send("POST", "/api/scans", { fetch, force_research: false });
+      await send("POST", "/api/scans", { fetch: true });
       mutate();
     } catch (e) {
       setMsg(e instanceof Error ? e.message : String(e));
@@ -41,248 +37,149 @@ export default function Overview() {
     }
   };
 
-  const signalOption = useMemo(() => {
-    const s: Record<string, number> = data?.signals ?? {};
-    const keys = SIGNAL_ORDER.filter((k) => s[k]);
-    return baseOption({
-      grid: { left: 96, right: 36, top: 6, bottom: 6 },
-      tooltip: { trigger: "item" },
-      xAxis: valueAxis({ show: false, scale: false }),
-      yAxis: catAxis(keys.map((k) => (k === "None" ? "Screened out" : titleCase(k.toLowerCase()))).reverse(), { axisLine: { show: false } }),
-      series: [{ type: "bar", barWidth: 12, data: keys.map((k) => ({ value: s[k], itemStyle: { color: SIGNAL_COLOR[k], borderRadius: 2 } })).reverse(), label: { show: true, position: "right", color: C.dim, fontSize: 11 } }],
-    });
-  }, [data]);
-
   if (error && !data) return <ErrorBox error={error} />;
-  if (!data) return <Loading rows={6} />;
-  const u = data.universe;
-  const last = data.scan.last;
-  const ok = data.scan.last_success;
+  if (!data) return <Loading rows={8} />;
+  const h = data.holdings;
+  const has = h.n_positions > 0;
   const regime = regimeLabel(data.regime?.regime);
   const running = scan.running || data.scan.running;
-  const failReasons: [string, number][] = Object.entries(u.screen_fail_reasons ?? {});
-  const exclusions: [string, number][] = Object.entries(u.listing_exclusions ?? {});
-  const stats = running ? scan.stats : (ok?.stats ?? {});
+  const scanned = data.stars.length;
 
   return (
     <>
-      <PageTitle
-        title="Overview"
-        sub="What the research engine is doing now, what it found on the last scan, and how healthy its data sources are. Every figure on this page comes from the backend; nothing is illustrative."
-        right={
-          <div className="flex items-center gap-2">
-            <button className="btn" disabled={busy || running} onClick={() => run(false)} title="Re-screen and re-score from stored data without downloading">
-              Re-score stored data
-            </button>
-            <button className="btn btn-primary" disabled={busy || running} onClick={() => run(true)}>
-              {running ? "Scan running" : "Run scan now"}
-            </button>
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(340px,1fr)]">
+        {/* The universe: bare, full-bleed, the one loud element on the page */}
+        <section className="relative overflow-hidden rounded-2xl border border-line/30 bg-bg/30" aria-label="Stock universe map">
+          <div className="pointer-events-none z-[1] px-4 pt-4 lg:absolute lg:left-4 lg:top-4 lg:p-0">
+            <h1 className="display text-[26px] font-medium leading-none sm:text-[32px]">Your universe</h1>
+            <p className="mt-1.5 max-w-xs text-[12px] text-dim">
+              {scanned ? `${scanned} stocks from the last scan. The ringed ones are yours.` : "No scan yet. Run one to light up the map."}
+            </p>
           </div>
-        }
-      />
-      {msg && <div className="mb-3 rounded border border-down/40 bg-down/5 px-3 py-2 text-xs text-down">{msg}</div>}
-
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <Stat label="Exchange listings" value={fmtNum(u.listed, 0)} sub="NYSE and NASDAQ directory" />
-        <Stat label="Eligible common stocks" value={fmtNum(u.eligible_listings, 0)} sub="after security-type exclusions" />
-        <Stat label="Scanned" value={fmtNum(u.scanned, 0)} sub="most liquid first" />
-        <Stat label="Passed screen" value={fmtNum(u.passed, 0)} cls="text-up" sub={u.scanned ? `${Math.round((100 * (u.passed ?? 0)) / u.scanned)}% of scanned` : undefined} />
-        <Stat label="Failed screen" value={fmtNum(u.failed, 0)} cls="text-down" sub="with recorded reasons" />
-        <Stat label="Market regime" value={regime.label} cls={regime.cls} sub={data.regime?.as_of ? `as of ${data.regime.as_of}` : "no scan yet"} />
-      </div>
-
-      <div className="mt-3 grid gap-3 xl:grid-cols-3">
-        <Card title="Scan activity" className="xl:col-span-1" right={running ? <Tag tone="accent">Running</Tag> : last?.status === "failed" ? <Tag tone="down">Last run failed</Tag> : <Tag>Idle</Tag>}>
-          <div className="space-y-3">
-            <div>
-              <div className="flex items-baseline justify-between text-[12.5px]">
-                <span className={running ? "text-accent" : "text-dim"}>{running ? stageLabel(scan.stage ?? last?.stage) : last ? stageLabel(last.stage) : "No scan has run yet"}</span>
-                <span className="num text-dim">{running ? `${Math.round(scan.progress * 100)}%` : ""}</span>
-              </div>
-              <div className="mt-1.5 h-1.5 rounded-sm bg-line">
-                <div className={`h-full rounded-sm transition-[width] duration-700 ${running ? "bg-accent" : "bg-faint/50"}`} style={{ width: `${running ? Math.max(2, scan.progress * 100) : last ? 100 : 0}%` }} />
+          {scanned ? (
+            <StarMap stars={data.stars} height={narrow ? 460 : 660} />
+          ) : (
+            <div className="flex h-[660px] items-center justify-center">
+              <div className="text-center">
+                <button className="btn btn-primary px-5 py-2.5 text-sm" disabled={busy || running} onClick={runScan}>
+                  {running ? `${stageLabel(scan.stage)} ${Math.round(scan.progress * 100)}%` : "Run the first scan"}
+                </button>
+                <p className="note mt-3 max-w-xs">It verifies listings, downloads prices and filings, and scores about 300 stocks. Expect roughly ten minutes.</p>
               </div>
             </div>
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[12px]">
-              <dt className="text-dim">Last successful scan</dt>
-              <dd className="num text-right">{ok ? `${fmtDateTime(ok.finished_at)} (${timeAgo(ok.finished_at)})` : "never"}</dd>
-              <dt className="text-dim">Next scheduled scan</dt>
-              <dd className="num text-right">{data.scan.next_scheduled ? fmtDateTime(data.scan.next_scheduled) : "scheduler off"}</dd>
+          )}
+        </section>
+
+        <div className="flex flex-col gap-4">
+          <Card title="My portfolio" right={<Link href="/portfolio" className="text-[12px] text-dim hover:text-accent">Manage holdings</Link>}>
+            {has ? (
+              <>
+                <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
+                  <div>
+                    <div className="display num text-[30px] font-medium leading-none">
+                      <CountUp value={h.value} format={(v) => fmtMoney(v, 0)} />
+                    </div>
+                    <div className="mt-1 text-[11.5px] text-faint">at the close of {h.as_of}</div>
+                  </div>
+                  <dl className="num grid grid-cols-2 gap-x-5 text-right text-[12.5px]">
+                    <dt className="text-faint">Last session</dt>
+                    <dd className={signClass(h.day_change)}>
+                      {fmtMoney(h.day_change, 0)} ({fmtPct(h.day_change_pct, 2, true)})
+                    </dd>
+                    <dt className="text-faint">Total gain</dt>
+                    <dd className={signClass(h.gain)}>
+                      {fmtMoney(h.gain, 0)} ({fmtPct(h.gain_pct, 1, true)})
+                    </dd>
+                  </dl>
+                </div>
+                <div className="mt-3">
+                  <PortfolioTracker height={228} compact />
+                </div>
+              </>
+            ) : (
+              <Empty title="Add the stocks you own">
+                Record your holdings to track their value, gains, risk, signals and news here.{" "}
+                <Link href="/portfolio" className="text-accent underline">
+                  Add holdings
+                </Link>
+              </Empty>
+            )}
+          </Card>
+          <Card title="Conditions">
+            <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1.5 text-[12.5px]">
+              <dt className="text-dim">Market regime</dt>
+              <dd className={`text-right font-semibold ${regime.cls}`}>{regime.label}</dd>
+              <dt className="text-dim">Research engine</dt>
+              <dd className="text-right">{running ? <span className="text-accent">{stageLabel(scan.stage)} {Math.round(scan.progress * 100)}%</span> : `idle · last scan ${timeAgo(data.scan.last_success?.finished_at)}`}</dd>
               <dt className="text-dim">Prices as of</dt>
-              <dd className="num text-right">{stats.price_as_of ?? "—"}</dd>
-              <dt className="text-dim">Stocks with SEC fundamentals</dt>
-              <dd className="num text-right">{fmtNum(stats.with_fundamentals, 0)}</dd>
-              <dt className="text-dim">Price / filing fetch failures</dt>
-              <dd className="num text-right">
-                {fmtNum(stats.price_failures, 0)} / {fmtNum(stats.fundamentals_failures, 0)}
-              </dd>
-              <dt className="text-dim">Alerts from last scan</dt>
-              <dd className="num text-right">{fmtNum(stats.alerts_generated, 0)}</dd>
+              <dd className="num text-right">{data.scan.last_success?.stats?.price_as_of ?? "—"}</dd>
+              <dt className="text-dim">Sentiment engine</dt>
+              <dd className="text-right">{data.engine.is_ai ? "FinBERT (local AI)" : "Word list"}</dd>
             </dl>
-            {last?.status === "failed" && <div className="rounded border border-down/40 bg-down/5 px-2 py-1.5 text-[11.5px] text-down">{last.error}</div>}
-            <div>
-              <div className="mb-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-faint">Live event log</div>
-              <ul className="max-h-36 space-y-0.5 overflow-y-auto text-[11.5px]" aria-live="polite">
-                {events.length === 0 && <li className="text-faint">Waiting for backend events. Start a scan to watch it work.</li>}
-                {events.slice(0, 30).map((e) => (
-                  <li key={e.id} className="flex gap-2">
-                    <span className="num shrink-0 text-faint">{new Date(e.ts * 1000).toLocaleTimeString("en-US", { hour12: false })}</span>
-                    <span className="truncate text-dim">
-                      {e.type === "scan_progress" ? `${stageLabel(e.data.stage)}${e.data.symbol ? ` · ${e.data.symbol}` : ""}` : e.type === "alert" ? `Alert: ${e.data.title}` : titleCase(e.type)}
+            <div className="mt-3 flex items-center gap-2">
+              <button className="btn btn-primary" disabled={busy || running} onClick={runScan}>
+                {running ? "Scan running" : "Run scan now"}
+              </button>
+              <Link href="/system" className="btn">
+                Scan details
+              </Link>
+            </div>
+            {msg && <div className="mt-2 text-[12px] text-down">{msg}</div>}
+          </Card>
+        </div>
+      </div>
+
+      {has && (
+        <section className="mt-4" aria-label="Your holdings">
+          <div className="mb-2 flex items-baseline justify-between">
+            <h2 className="display text-[15px] font-medium">Holdings</h2>
+            <span className="note">{h.n_positions} positions · click one for its research page</span>
+          </div>
+          <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))" }}>
+            {h.positions.map((p: J) => (
+              <HoldingTile key={p.symbol} p={p} />
+            ))}
+          </div>
+          {h.missing_prices.length > 0 && <p className="note mt-2">No stored prices yet for {h.missing_prices.join(", ")}. They are valued after the next scan.</p>}
+        </section>
+      )}
+
+      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+        <Card title={has ? "News on your holdings" : "Latest headlines"} right={<Link href="/news" className="text-[12px] text-dim hover:text-accent">All news</Link>}>
+          <NewsFeed scope={has ? "holdings" : "all"} limit={8} />
+        </Card>
+        <div className="flex flex-col gap-4">
+          <Card title="What changed" right={<Link href="/alerts" className="text-[12px] text-dim hover:text-accent">{data.unread_alerts} unread</Link>}>
+            {data.recent_alerts.length ? (
+              <ul className="space-y-2 text-[12.5px]">
+                {data.recent_alerts.map((a: J) => (
+                  <li key={a.id} className="flex items-start justify-between gap-3">
+                    <span className="min-w-0">
+                      {a.symbol && <SymbolLink symbol={a.symbol} />} <span className="text-dim">{a.title.replace(/^(STRONG BUY|BUY|SELL): [A-Z-]+ /, "").replace(/^[A-Z-]+ /, "").replace(/\((.*?)( - .*| Common.*| Class.*)?\)$/, "$1")}</span>
+                      <span className="block text-[11px] text-faint">{titleCase(a.kind)} · {timeAgo(a.created_at)}</span>
                     </span>
+                    {a.payload?.signal && <span className="shrink-0"><SignalChip signal={a.payload.signal} /></span>}
                   </li>
                 ))}
               </ul>
-            </div>
-          </div>
-        </Card>
-
-        <Card title="Top-ranked opportunities" className="xl:col-span-2" pad={false} right={<Link href="/stocks" className="text-[11px] text-dim hover:text-accent">Open explorer</Link>}>
-          {data.top.length === 0 ? (
-            <Empty title="No ranked stocks yet">Run a scan. Stocks appear here once they pass the screen and are scored.</Empty>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-line">
-                    <th className="th">Symbol</th>
-                    <th className="th">Company</th>
-                    <th className="th">Exch.</th>
-                    <th className="th">Sector</th>
-                    <th className="th text-right">Price</th>
-                    <th className="th text-right">Mkt cap</th>
-                    <th className="th">Score</th>
-                    <th className="th">Signal</th>
-                    <th className="th">Data</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.top.map((r: J) => (
-                    <tr key={r.symbol} className="border-b border-line/50 hover:bg-raised/50">
-                      <td className="td"><SymbolLink symbol={r.symbol} /></td>
-                      <td className="td max-w-[220px] truncate text-dim">{(r.company ?? "").replace(/ - .*$| Common Stock.*$/i, "")}</td>
-                      <td className="td text-dim">{r.exchange}</td>
-                      <td className="td text-dim">{r.sector}</td>
-                      <td className="td num text-right">{fmtMoney(r.price)}</td>
-                      <td className="td num text-right text-dim">{fmtCompact(r.market_cap, "$")}</td>
-                      <td className="td"><ScoreBar value={r.score} /></td>
-                      <td className="td"><SignalChip signal={r.signal} /></td>
-                      <td className="td num text-dim" title="Share of score components with data (A is best)">{r.data_quality}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-          <p className="note border-t border-line px-4 py-2">A score ranks stocks on evidence-backed characteristics. It is not a probability of profit, and a high score is not a recommendation to buy. Prices as of each stock&apos;s last completed session.</p>
-        </Card>
+            ) : (
+              <Empty title="Nothing has changed">Alerts appear when a signal, score, risk flag or news tone changes.</Empty>
+            )}
+          </Card>
+          <Card title="Live activity" right={running ? <Tag tone="accent">Scanning</Tag> : <Tag>Idle</Tag>}>
+            <ul className="max-h-32 space-y-0.5 overflow-y-auto text-[12px]" aria-live="polite">
+              {events.length === 0 && <li className="text-faint">Waiting for the research engine. Start a scan to watch it work.</li>}
+              {events.slice(0, 24).map((e) => (
+                <li key={e.id} className="flex gap-2">
+                  <span className="num shrink-0 text-faint">{new Date(e.ts * 1000).toLocaleTimeString("en-US", { hour12: false })}</span>
+                  <span className="truncate text-dim">{e.type === "scan_progress" ? `${stageLabel(e.data.stage)}${e.data.symbol ? ` ${e.data.symbol}` : ""}` : e.type === "alert" ? e.data.title : titleCase(e.type)}</span>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        </div>
       </div>
-
-      <div className="mt-3 grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
-        <Card title="Current signals">
-          {Object.keys(data.signals).length ? <EChart option={signalOption} height={170} /> : <Empty title="No signals yet" />}
-        </Card>
-        <Card title="Why stocks failed the screen">
-          {failReasons.length ? (
-            <ul className="space-y-1.5 text-[12.5px]">
-              {failReasons.map(([k, n]) => (
-                <li key={k} className="flex justify-between gap-3">
-                  <span className="text-dim">{RULE_LABEL[k] ?? k}</span>
-                  <span className="num">{n}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <Empty title="No rejections recorded" />
-          )}
-          <p className="note mt-3">A stock can fail several rules. Open any stock to see each rule, the observed value and the threshold.</p>
-        </Card>
-        <Card title="Listings excluded before screening">
-          {exclusions.length ? (
-            <ul className="max-h-44 space-y-1.5 overflow-y-auto text-[12.5px]">
-              {exclusions.map(([k, n]) => (
-                <li key={k} className="flex justify-between gap-3">
-                  <span className="truncate text-dim" title={k}>{titleCase(k.replace("security type: ", "").replace(/ \(.*\)$/, ""))}</span>
-                  <span className="num">{n}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <Empty title="No scan yet" />
-          )}
-          <p className="note mt-3">Only NYSE and NASDAQ listings enter the universe. OTC and other venues are never loaded.</p>
-        </Card>
-        <Card title="New signals" right={<Link href="/alerts" className="text-[11px] text-dim hover:text-accent">All alerts</Link>}>
-          {data.new_signals.length ? (
-            <ul className="space-y-2 text-[12px]">
-              {data.new_signals.slice(0, 6).map((a: J) => (
-                <li key={a.id} className="flex items-start justify-between gap-2">
-                  <span className="min-w-0">
-                    {a.symbol && <SymbolLink symbol={a.symbol} />} <span className="text-dim">{(a.payload?.company ?? "").replace(/ - .*$| Common Stock.*$| Class .*$/i, "")}</span>
-                  </span>
-                  <span className="shrink-0"><SignalChip signal={a.payload?.signal} /></span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <Empty title="No signal changes">Alerts fire only when a signal changes, not on every scan.</Empty>
-          )}
-        </Card>
-      </div>
-
-      <div className="mt-3 grid gap-3 xl:grid-cols-3">
-        <Card title="Active strategies" pad={false} right={<Link href="/strategies" className="text-[11px] text-dim hover:text-accent">Research</Link>}>
-          <table className="w-full">
-            <tbody>
-              {data.strategies.map((s: J) => (
-                <tr key={s.key} className="border-b border-line/50 last:border-0">
-                  <td className="td whitespace-normal">{s.name}<div className="text-[10.5px] text-faint">{s.family}</div></td>
-                  <td className="td text-right">
-                    {s.status === "supported" ? <Tag tone="up">Supported</Tag> : s.status === "mixed" ? <Tag tone="accent">Mixed</Tag> : s.status ? <Tag tone="down">Not supported</Tag> : <Tag>Not tested</Tag>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p className="note border-t border-line px-4 py-2">Status reflects backtested results after costs against the equal-weight universe.</p>
-        </Card>
-        <Card title="Models" right={<Link href="/ml" className="text-[11px] text-dim hover:text-accent">Monitor</Link>}>
-          {data.models.length ? (
-            <ul className="space-y-2 text-[12.5px]">
-              {data.models.map((m: J) => (
-                <li key={m.name} className="flex items-center justify-between gap-2">
-                  <span>{titleCase(m.name)}</span>
-                  <span className="flex items-center gap-2">
-                    <span className="num text-dim" title="Out-of-sample rank information coefficient">IC {fmtNum(m.oos_rank_ic, 3)}</span>
-                    {m.active ? <Tag tone="up">In score</Tag> : m.validated ? <Tag tone="accent">Validated</Tag> : <Tag>Not validated</Tag>}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <Empty title={data.ml_status === "insufficient_history" ? "Not enough history to train" : "No model trained yet"} />
-          )}
-          <p className="note mt-3">A model contributes to scores only after it passes out-of-sample validation. Version {data.ml_version ?? "—"}.</p>
-        </Card>
-        <Card title="Data provider health" pad={false}>
-          <table className="w-full">
-            <tbody>
-              {data.providers.map((p: J) => (
-                <tr key={p.key} className="border-b border-line/50 last:border-0" title={p.limits}>
-                  <td className="td">
-                    <div className="max-w-[230px] truncate">{p.name}</div>
-                    <div className="text-[10.5px] text-faint">{p.freshness}</div>
-                  </td>
-                  <td className="td text-right text-[11px] text-dim">{p.last_success ? timeAgo(p.last_success) : "not used yet"}</td>
-                  <td className="td text-right">
-                    {p.status === "ok" ? <Tag tone="up">OK</Tag> : p.status === "failing" ? <Tag tone="down">Failing</Tag> : p.status === "degraded" ? <Tag tone="warn">Degraded</Tag> : <Tag>Unknown</Tag>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-      </div>
+      <p className="note mt-4">{data.disclaimer} Prices are end-of-day; a score ranks stocks and is not a probability of profit.</p>
     </>
   );
 }

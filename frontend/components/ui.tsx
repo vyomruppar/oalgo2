@@ -3,6 +3,7 @@
 import Link from "next/link";
 import useSWR from "swr";
 import { fetcher, type J } from "@/lib/api";
+import { useEffect, useRef, useState } from "react";
 import { fmtNum, scoreColor, signalStyle } from "@/lib/format";
 
 export function useApi(path: string | null, refreshMs = 0) {
@@ -26,7 +27,7 @@ export function Card({ title, right, children, className = "", pad = true }: { t
 export function Stat({ label, value, sub, cls = "" }: { label: string; value: React.ReactNode; sub?: React.ReactNode; cls?: string }) {
   return (
     <div className="card px-4 py-3">
-      <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-faint">{label}</div>
+      <div className="sub">{label}</div>
       <div className={`num mt-1 text-xl font-medium leading-tight ${cls}`}>{value}</div>
       {sub && <div className="mt-0.5 text-[11px] text-faint">{sub}</div>}
     </div>
@@ -107,7 +108,7 @@ export function PageTitle({ title, sub, right }: { title: string; sub?: React.Re
   return (
     <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
+        <h1 className="display text-[21px] font-medium leading-tight">{title}</h1>
         {sub && <p className="note mt-0.5 max-w-3xl">{sub}</p>}
       </div>
       {right}
@@ -133,5 +134,74 @@ export function KV({ rows }: { rows: [React.ReactNode, React.ReactNode][] }) {
         </div>
       ))}
     </dl>
+  );
+}
+
+/** Animates a number to its new value once when it changes; jumps straight there under reduced motion. */
+export function CountUp({ value, format, duration = 900 }: { value: number | null | undefined; format: (v: number) => string; duration?: number }) {
+  const [shown, setShown] = useState<number | null>(typeof value === "number" ? value : null);
+  const from = useRef<number>(0);
+  useEffect(() => {
+    if (typeof value !== "number" || !Number.isFinite(value)) return setShown(null);
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return setShown(value);
+    const start = performance.now();
+    const a = from.current;
+    let raf = 0;
+    const tick = (t: number) => {
+      const k = Math.min(1, (t - start) / duration);
+      const e = 1 - Math.pow(1 - k, 3);
+      setShown(a + (value - a) * e);
+      if (k < 1) raf = requestAnimationFrame(tick);
+      else from.current = value;
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value, duration]);
+  return <>{shown == null ? "—" : format(shown)}</>;
+}
+
+export function Sparkline({ data, width = 96, height = 28, color }: { data: number[]; width?: number; height?: number; color?: string }) {
+  if (!data || data.length < 2) return <svg width={width} height={height} aria-hidden />;
+  const min = Math.min(...data);
+  const max = Math.max(...data);
+  const span = max - min || 1;
+  const pts = data.map((v, i) => [(i / (data.length - 1)) * width, height - 2 - ((v - min) / span) * (height - 4)]);
+  const d = pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join("");
+  const c = color ?? (data[data.length - 1] >= data[0] ? "rgb(61 242 196)" : "rgb(255 92 122)");
+  const id = `sg-${Math.round(pts[pts.length - 1][1] * 100)}-${data.length}-${Math.round(min)}`;
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label="60-day price trend">
+      <defs>
+        <linearGradient id={id} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor={c} stopOpacity="0.35" />
+          <stop offset="100%" stopColor={c} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={`${d}L${width},${height}L0,${height}Z`} fill={`url(#${id})`} />
+      <path d={d} fill="none" stroke={c} strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function SentimentBadge({ s, compact = false }: { s: { score: number | null; label: string | null; n: number } | null | undefined; compact?: boolean }) {
+  if (!s || s.score == null) return <span className="text-[11px] text-faint">{compact ? "no news" : "No recent headlines"}</span>;
+  const tone = s.label === "positive" ? "text-up border-up/40" : s.label === "negative" ? "text-down border-down/50" : "text-dim border-line";
+  return (
+    <span className={`chip ${tone}`} title={`Weighted tone of ${s.n} recent headline${s.n === 1 ? "" : "s"}: ${s.score >= 0 ? "+" : ""}${s.score.toFixed(2)} on a -1 to +1 scale. Headline tone only, not a forecast.`}>
+      {s.label === "positive" ? "Positive" : s.label === "negative" ? "Negative" : "Neutral"}
+      {!compact && <span className="num ml-1 font-normal opacity-80">{s.score >= 0 ? "+" : ""}{s.score.toFixed(2)} · {s.n}</span>}
+    </span>
+  );
+}
+
+export function Tabs({ tabs, current }: { tabs: { href: string; label: string }[]; current: string }) {
+  return (
+    <div className="mb-4 flex gap-1 border-b border-line/40">
+      {tabs.map((t) => (
+        <Link key={t.href} href={t.href} aria-current={t.href === current ? "page" : undefined} className={`-mb-px border-b-2 px-3 py-2 text-[13px] font-medium transition-colors ${t.href === current ? "border-accent text-ink" : "border-transparent text-dim hover:text-ink"}`}>
+          {t.label}
+        </Link>
+      ))}
+    </div>
   );
 }
