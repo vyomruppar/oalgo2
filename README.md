@@ -26,7 +26,7 @@ For AI headline sentiment, also install the free local FinBERT model once (about
 make install-ai
 ```
 
-Open http://localhost:3000 and press **Run scan now**. The first scan of 300 stocks takes about ten minutes (the free data sources are rate limited); later scans reuse the cache. After that, a scan runs automatically on weekdays at 22:30 UTC while the backend is running.
+Open http://localhost:3000 and press **Run scan now**. The dashboard server forwards `/api` to the backend, so only port 3000 needs to be reachable: to use it from another device on your network, open `http://<this-computer's-address>:3000`. The first scan of 300 stocks takes about ten minutes (the free data sources are rate limited); later scans reuse the cache. After that, a scan runs automatically on weekdays at 22:30 UTC while the backend is running.
 
 Optional settings go in `backend/.env` (see `.env.example`). Setting `OALGO_SEC_USER_AGENT` to your own contact string is recommended, as the SEC asks automated clients to identify themselves.
 

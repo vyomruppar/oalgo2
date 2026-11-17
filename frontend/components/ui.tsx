@@ -91,7 +91,7 @@ export function Empty({ title, children }: { title: string; children?: React.Rea
 
 export function ErrorBox({ error }: { error: unknown }) {
   const msg = error instanceof Error ? error.message : String(error);
-  const offline = msg.includes("Failed to fetch") || msg.includes("NetworkError");
+  const offline = msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("Internal Server Error") || msg.includes("ECONNREFUSED");
   return (
     <div className="m-4 rounded border border-down/40 bg-down/5 px-3 py-2 text-xs text-down">
       {offline ? "Cannot reach the research backend. Start it with `make backend` and this page will reconnect." : msg}

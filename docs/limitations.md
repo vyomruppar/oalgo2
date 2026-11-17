@@ -60,7 +60,7 @@ A research and paper-trading workstation. It ranks and explains; it does not pre
 
 ## Operations
 
-- Single local user, no authentication. Do not expose the backend to a network you do not control.
+- Single local user, no authentication. Anyone who can reach port 3000 can see your holdings and change settings, so do not expose it to a network you do not control or to the public internet without adding a login in front of it.
 - Desktop notifications require the dashboard to be open in a browser tab; e-mail needs SMTP settings.
 - The scheduler runs inside the backend process; scans happen only while it is running.
 

@@ -1,5 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+// Same-origin by default: Next forwards /api to the backend (see next.config.mjs).
+// Set NEXT_PUBLIC_API_URL only to call a backend on another address directly.
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export type J = any;
 
