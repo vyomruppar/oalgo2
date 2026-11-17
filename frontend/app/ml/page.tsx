@@ -19,8 +19,8 @@ export default function ModelMonitor() {
       yAxis: valueAxis({ min: 0.3, max: 0.7 }),
       tooltip: { trigger: "item", formatter: (p: J) => (p.seriesName === "Observed" ? `score ${p.value[0].toFixed(3)} → beat median ${(p.value[1] * 100).toFixed(1)}% of the time (n=${p.value[2]})` : "perfect calibration") },
       series: [
-        { name: "Perfect calibration", type: "line", showSymbol: false, lineStyle: { type: "dashed", color: C.faint, width: 1 }, data: [[0.3, 0.3], [0.7, 0.7]] },
-        { name: "Observed", type: "line", color: C.accent, symbolSize: (v: number[]) => Math.max(5, Math.min(18, Math.sqrt(v[2]) / 4)), data: m.calibration.map((c: J) => [c.predicted, c.actual, c.n]) },
+        { name: "Perfect calibration", type: "line", showSymbol: false, color: C.faint, lineStyle: { type: "dashed", color: C.faint, width: 1 }, data: [[0.3, 0.3], [0.7, 0.7]] },
+        { name: "Observed", type: "line", color: C.accent, symbol: "circle", itemStyle: { color: C.accent }, symbolSize: (v: number[]) => Math.max(5, Math.min(14, Math.sqrt(v[2]) / 8)), data: m.calibration.map((c: J) => [c.predicted, c.actual, c.n]) },
       ],
     });
   }, [m]);
@@ -59,7 +59,7 @@ export default function ModelMonitor() {
       legend: { show: false },
       xAxis: catAxis(e.map((x) => String(x.year))),
       yAxis: valueAxis({ min: 0.4, max: 0.6, axisLabel: { color: C.faint, fontSize: 10.5, formatter: (v: number) => `${(v * 100).toFixed(0)}%` } }),
-      series: [{ type: "bar", barWidth: 18, data: e.map((x) => ({ value: x.accuracy, itemStyle: { color: x.accuracy >= 0.5 ? C.up : C.down, opacity: 0.8 } })), markLine: { symbol: "none", lineStyle: { color: C.faint, type: "dashed" }, data: [{ yAxis: 0.5 }], label: { formatter: "coin flip", color: C.faint, fontSize: 10 } } }],
+      series: [{ type: "bar", barWidth: 18, data: e.map((x) => ({ value: x.accuracy, itemStyle: { color: x.accuracy >= 0.5 ? C.up : C.down, opacity: 0.8 } })), markLine: { symbol: "none", lineStyle: { color: C.faint, type: "dashed" }, data: [{ yAxis: 0.5 }], label: { formatter: "coin flip", color: C.faint, fontSize: 10, position: "insideEndTop" } } }],
     });
   }, [m]);
 
@@ -95,14 +95,13 @@ export default function ModelMonitor() {
       <div className="mt-3 grid gap-3 xl:grid-cols-3">
         <Card title="Models and versions" pad={false}>
           <table className="w-full">
-            <thead><tr className="border-b border-line"><th className="th">Model</th><th className="th text-right">OOS AUC</th><th className="th text-right">OOS IC</th><th className="th text-right">IC t</th><th className="th">Status</th></tr></thead>
+            <thead><tr className="border-b border-line"><th className="th">Model</th><th className="th text-right" title="Out-of-sample rank information coefficient">OOS IC</th><th className="th text-right">t-stat</th><th className="th">Status</th></tr></thead>
             <tbody>
               {names.map((n) => {
                 const o = data.models[n].out_of_sample;
                 return (
                   <tr key={n} onClick={() => setModel(n)} className={`cursor-pointer border-b border-line/50 hover:bg-raised/50 ${n === model ? "bg-raised" : ""}`}>
                     <td className="td">{titleCase(n)}</td>
-                    <td className="td num text-right">{fmtNum(o.auc, 3)}</td>
                     <td className={`td num text-right ${signClass(o.rank_ic_mean)}`}>{fmtNum(o.rank_ic_mean, 3)}</td>
                     <td className="td num text-right">{fmtNum(o.rank_ic_t)}</td>
                     <td className="td">{data.active_model === n ? <Tag tone="up">In score</Tag> : data.models[n].validated ? <Tag tone="accent">Validated</Tag> : <Tag>Not validated</Tag>}</td>
@@ -124,7 +123,7 @@ export default function ModelMonitor() {
         </Card>
         <Card title={`${titleCase(model)} · train vs validation vs out-of-sample`} pad={false}>
           <table className="w-full">
-            <thead><tr className="border-b border-line"><th className="th">Metric</th><th className="th text-right">Train</th><th className="th text-right">Validation</th><th className="th text-right">Out-of-sample</th></tr></thead>
+            <thead><tr className="border-b border-line"><th className="th">Metric</th><th className="th text-right">Train</th><th className="th text-right">Valid.</th><th className="th text-right" title="Out-of-sample">Unseen</th></tr></thead>
             <tbody>
               {[["AUC", "auc", 3], ["Accuracy", "accuracy", 3], ["Brier score", "brier", 3], ["Rank IC", "rank_ic_mean", 3]].map(([label, k, d]) => (
                 <tr key={k as string} className="border-b border-line/50">
@@ -134,7 +133,7 @@ export default function ModelMonitor() {
                   <td className="td num text-right font-semibold">{fmtNum(oos[k as string], d as number)}</td>
                 </tr>
               ))}
-              <tr><td className="td text-dim">Top minus bottom decile, 21d</td><td className="td" /><td className="td" /><td className={`td num text-right ${signClass(oos.top_minus_bottom_decile_21d)}`}>{fmtPct(oos.top_minus_bottom_decile_21d, 2, true)}</td></tr>
+              <tr><td className="td whitespace-normal text-dim" colSpan={3}>Top minus bottom decile, next 21 days</td><td className={`td num text-right ${signClass(oos.top_minus_bottom_decile_21d)}`}>{fmtPct(oos.top_minus_bottom_decile_21d, 2, true)}</td></tr>
             </tbody>
           </table>
           <p className="note px-4 py-3">Train and validation are averages over folds; out-of-sample pools {fmtNum(oos.n, 0)} predictions across {oos.n_dates} months that the model never saw. A gap between train and out-of-sample is the size of the overfit. AUC 0.5 and IC 0 mean no skill.</p>
@@ -167,16 +166,16 @@ export default function ModelMonitor() {
           </table>
           <p className="note px-4 py-2">Population Stability Index of today&apos;s cross-section against the training distribution. Below 0.10 stable, above 0.25 significant drift.</p>
         </Card>
-        <Card title="Walk-forward folds" pad={false}>
+        <Card title={`Walk-forward folds · data from ${data.folds[0]?.train[0].slice(0, 7)}`} pad={false}>
           <div className="max-h-80 overflow-y-auto">
             <table className="w-full">
-              <thead><tr className="border-b border-line"><th className="th">Train</th><th className="th">Validation</th><th className="th">Test (unseen)</th><th className="th text-right">Test IC</th></tr></thead>
+              <thead><tr className="border-b border-line"><th className="th">Fit to</th><th className="th">Validation to</th><th className="th">Test (unseen)</th><th className="th text-right">Test IC</th></tr></thead>
               <tbody>
                 {data.folds.map((f: J, i: number) => (
                   <tr key={i} className="border-b border-line/50 text-[11.5px]">
-                    <td className="td num text-dim">{f.train[0].slice(0, 7)} → {f.train[1].slice(0, 7)}</td>
-                    <td className="td num text-dim">{f.validation[0].slice(0, 7)} → {f.validation[1].slice(0, 7)}</td>
-                    <td className="td num">{f.test[0].slice(0, 7)} → {f.test[1].slice(0, 7)}</td>
+                    <td className="td num text-dim">{f.train[1].slice(0, 7)}</td>
+                    <td className="td num text-dim">{f.validation[1].slice(0, 7)}</td>
+                    <td className="td num">{f.test[0].slice(2, 7)} to {f.test[1].slice(2, 7)}</td>
                     <td className={`td num text-right ${signClass(f.models[model]?.out_of_sample?.rank_ic_mean)}`}>{fmtNum(f.models[model]?.out_of_sample?.rank_ic_mean, 3)}</td>
                   </tr>
                 ))}

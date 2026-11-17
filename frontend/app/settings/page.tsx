@@ -114,7 +114,7 @@ export default function Settings() {
               return (
                 <div key={k}>
                   <div className="flex items-baseline justify-between gap-3 text-[12px]">
-                    <label htmlFor={`w-${k}`} className="text-dim" title={data.component_labels[k]}>{titleCase(k)}</label>
+                    <label htmlFor={`w-${k}`} className="text-dim" title={data.component_labels[k]}>{k === "ml" ? "Machine learning" : titleCase(k)}</label>
                     <span className="num">{fmtNum(w, 0)} <span className="text-faint">({total > 0 ? ((100 * w) / total).toFixed(0) : 0}%)</span></span>
                   </div>
                   <input id={`w-${k}`} type="range" min={0} max={40} step={1} value={w} onChange={(e) => setScore({ ...score, weights: { ...score.weights, [k]: Number(e.target.value) } })} className="w-full accent-[#d6a85c]" />
@@ -146,18 +146,16 @@ export default function Settings() {
         {!prov.data ? <Loading /> : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead><tr className="border-b border-line">{["Provider", "Used for", "Freshness", "Cost", "Status", "Last success", "Requests ok / failed", "Limitations"].map((h) => <th key={h} className="th">{h}</th>)}</tr></thead>
+              <thead><tr className="border-b border-line">{["Provider and limitations", "Used for", "Freshness", "Status", "Last success", "Requests ok / failed"].map((h) => <th key={h} className="th">{h}</th>)}</tr></thead>
               <tbody>
                 {prov.data.map((p: J) => (
                   <tr key={p.key} className="border-b border-line/50 align-top text-[12px]">
-                    <td className="td font-medium">{p.name}</td>
+                    <td className="td whitespace-normal" style={{ minWidth: 340 }}><div className="font-medium">{p.name} <span className="font-normal text-faint">· {p.cost}</span></div><div className="mt-0.5 text-[11.5px] leading-relaxed text-faint">{p.limits}{p.last_error ? ` Last error: ${p.last_error}` : ""}</div></td>
                     <td className="td text-dim">{p.use}</td>
                     <td className="td text-dim">{p.freshness}</td>
-                    <td className="td text-dim">{p.cost}</td>
                     <td className="td">{p.status === "ok" ? <Tag tone="up">OK</Tag> : p.status === "failing" ? <Tag tone="down">Failing</Tag> : p.status === "degraded" ? <Tag tone="warn">Degraded</Tag> : <Tag>Unknown</Tag>}</td>
                     <td className="td num text-dim">{p.last_success ? timeAgo(p.last_success) : "never"}</td>
                     <td className="td num text-dim">{p.success_count} / {p.failure_count}</td>
-                    <td className="td whitespace-normal text-faint" style={{ minWidth: 280 }}>{p.limits}{p.last_error ? ` Last error: ${p.last_error}` : ""}</td>
                   </tr>
                 ))}
               </tbody>

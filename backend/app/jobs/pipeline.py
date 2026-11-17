@@ -25,7 +25,7 @@ from ..data.nasdaq_trader import NasdaqTrader
 from ..data.sec import SecEdgar, norm_ticker, sic_to_sector
 from ..data.validate import validate_prices
 from ..data.yahoo import INDEX_SYMBOLS, YahooPrices, last_bar_age_days
-from ..db import PaperPosition, ScanRun, ScoreHistory, Security, StockResult, kv_get, kv_set, session, utcnow
+from ..db import PaperPosition, PaperTrade, ScanRun, ScoreHistory, Security, StockResult, kv_get, kv_set, session, utcnow
 from ..paper import ledger
 from ..research import indicators as ind
 from ..research import ml
@@ -123,6 +123,8 @@ class Scan:
                              .order_by(Security.avg_dollar_volume.desc())).all()
             ranked = [r.symbol for r in rows if (r.last_price or 0) >= 1.0]
             held = [p.symbol for p in s.scalars(select(PaperPosition)).all()]
+            # stocks with a pending paper order must stay in the scan so the order can fill
+            held += [t.symbol for t in s.scalars(select(PaperTrade).where(PaperTrade.status == "pending")).all() if t.symbol not in held]
         self.stats["liquidity_ranked"] = len(ranked)
         pick = ranked[: self.max_symbols]
         return pick + [h for h in held if h not in pick]

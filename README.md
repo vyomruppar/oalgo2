@@ -65,7 +65,7 @@ data/           Created at runtime: SQLite database, price and fundamentals file
 make test
 ```
 
-Backend: 106 tests covering every indicator and metric against hand calculations, point-in-time and look-ahead checks, the backtester's fill timing and costs, validation statistics, the paper ledger, alert deduplication, parsers on recorded real responses, and the API. Frontend: type check and formatting tests.
+Backend: 107 tests covering every indicator and metric against hand calculations, point-in-time and look-ahead checks, the backtester's fill timing and costs, validation statistics, the paper ledger, alert deduplication, parsers on recorded real responses, and the API. Frontend: type check and formatting tests.
 
 ## Data sources
 

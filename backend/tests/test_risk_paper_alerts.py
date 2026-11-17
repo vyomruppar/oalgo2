@@ -34,6 +34,9 @@ def test_portfolio_analysis():
     assert out["var_99"]["hist_var"] >= out["var_95"]["hist_var"] > 0
     assert sum(x["risk_pct"] for x in out["risk_contributions"]) == pytest.approx(1.0)
     assert out["position_scenarios"][0]["stop_loss_pct_of_equity"] < 0
+    wn = (pos["quantity"] * pos["price"]); wn = wn / wn.sum()
+    assert out["concentration"]["effective_positions"] == pytest.approx(1 / (wn ** 2).sum())
+    assert 1.0 <= out["concentration"]["effective_positions"] <= 3.0          # never more than the number of positions
     assert risk.analyze(pd.DataFrame(), adj, None, {})["empty"] is True
 
 
@@ -157,3 +160,28 @@ def test_regime_and_provider_alerts(tmp_env):
     record_health("yahoo", True)
     assert len(engine.evaluate_providers()) == 1             # recovery notice
     assert engine.evaluate_providers() == []
+
+
+def test_paper_equity_curve_starts_at_inception(tmp_env):
+    from app.db import PaperEquity, session
+    from app.paper import ledger
+    ledger.reset(10_000.0)
+    df = make_prices(40, seed=4)
+    bench = df["close"] * 10
+    ledger.place_order("AAA", "BUY", 10, df.index[20].date().isoformat())
+    ledger.process(loader({"AAA": df.iloc[:21]}), bench.iloc[:21])          # order pending: only the inception mark
+    with session() as s:
+        marks = s.scalars(select(PaperEquity).order_by(PaperEquity.date)).all()
+        assert [(m.date, m.equity) for m in marks] == [(df.index[20].date().isoformat(), 10_000.0)]
+    ledger.process(loader({"AAA": df.iloc[:24]}), bench.iloc[:24])
+    with session() as s:
+        marks = s.scalars(select(PaperEquity).order_by(PaperEquity.date)).all()
+        assert [m.date for m in marks] == [d.date().isoformat() for d in df.index[20:24]]
+        assert marks[0].equity == 10_000.0
+        last = marks[-1]
+        assert last.positions_value == pytest.approx(10 * df["close"].iloc[23])
+        assert last.equity == pytest.approx(ledger.get_cash() + last.positions_value)
+        assert last.equity < 10_000.0 + 10 * (df["close"].iloc[23] - df["open"].iloc[21])   # costs were paid
+    ledger.process(loader({"AAA": df.iloc[:24]}), bench.iloc[:24])          # idempotent
+    with session() as s:
+        assert len(s.scalars(select(PaperEquity)).all()) == 4

@@ -47,7 +47,7 @@ export default function Portfolio() {
     const pos: J[] = d?.positions ?? [];
     if (!pos.length || !d.equity) return null;
     const data = pos.map((p) => ({ name: p.symbol, value: +(p.market_value ?? 0).toFixed(2) }));
-    data.push({ name: "Cash", value: +d.cash.toFixed(2) });
+    data.push({ name: "Cash", value: +d.cash.toFixed(2), itemStyle: { color: "#3a414d" } } as (typeof data)[number]);
     return baseOption({
       tooltip: { trigger: "item", valueFormatter: (v) => fmtMoney(Number(v), 0) },
       legend: { show: false },
@@ -163,14 +163,14 @@ export default function Portfolio() {
             <Card title="Portfolio risk">
               <KV rows={[
                 ["Volatility (annualised)", fmtPct(r.volatility)],
-                ["Beta / alpha vs SPY", `${fmtNum(r.beta)} / ${fmtPct(r.alpha)}`],
+                ["Beta vs SPY (including cash)", fmtNum(r.beta)],
                 ["Max drawdown (1y at current weights)", <span key="d" className="text-down">{fmtPct(r.max_drawdown)}</span>],
                 ["Calmar ratio", fmtNum(r.calmar)],
                 ["1-day VaR 95% (historical / normal)", `${fmtPct(r.var_95?.hist_var, 2)} / ${fmtPct(r.var_95?.param_var, 2)}`],
                 ["1-day CVaR 95% (historical)", fmtPct(r.var_95?.hist_cvar, 2)],
                 ["1-day VaR 99% / CVaR 99%", `${fmtPct(r.var_99?.hist_var, 2)} / ${fmtPct(r.var_99?.hist_cvar, 2)}`],
                 ["Largest position / top five", `${fmtPct(r.concentration.largest_weight)} / ${fmtPct(r.concentration.top5_weight)}`],
-                ["Effective number of positions", fmtNum(r.concentration.effective_positions, 1)],
+                ["Effective number of positions (invested part)", fmtNum(r.concentration.effective_positions, 1)],
                 ["Loss if every stop is hit", <span key="s" className="text-down">{fmtPct(r.all_stops_hit_pct_of_equity, 2)}</span>],
               ]} />
               <p className="note mt-3">VaR and CVaR are losses as a share of equity. Historical simulation assumes the past year is representative; real losses can exceed these figures.</p>
@@ -195,7 +195,7 @@ export default function Portfolio() {
                         <td className="td num text-right text-down">{fmtPct(s.stop_loss_pct_of_equity, 2)}</td>
                         <td className="td num text-right text-down">{fmtPct(s.worst_day_1y)}</td>
                         <td className="td num text-right text-down">{fmtPct(s.gap_loss_pct_of_equity, 2)}</td>
-                        <td className="td num text-right text-dim">{fmtNum(s.days_to_liquidate, 2)}</td>
+                        <td className="td num text-right text-dim">{s.days_to_liquidate != null && s.days_to_liquidate < 0.01 ? "< 0.01" : fmtNum(s.days_to_liquidate, 2)}</td>
                       </tr>
                     ))}
                   </tbody>

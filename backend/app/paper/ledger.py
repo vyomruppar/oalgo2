@@ -124,6 +124,19 @@ def process(load_prices: PriceLoader, benchmark: pd.Series | None = None) -> dic
         last_mark = s.scalars(select(PaperEquity).order_by(PaperEquity.date.desc()).limit(1)).first()
         ref = benchmark.dropna() if benchmark is not None else None
         if ref is not None and len(ref):
+            # Inception mark: the equity curve starts at the initial cash on the session the first
+            # order was based on, so the curve shows the whole life of the portfolio.
+            first_req = s.scalars(select(PaperTrade.requested_price_date).order_by(PaperTrade.id).limit(1)).first()
+            if first_req is not None:
+                base_idx = ref.index[ref.index <= pd.Timestamp(first_req)]
+                base = base_idx[-1].date().isoformat() if len(base_idx) else None
+                has_base = base is not None and s.scalars(select(PaperEquity).where(PaperEquity.date <= base).limit(1)).first() is not None
+                if base is not None and not has_base:
+                    initial = float(kv_get("paper:initial_cash", INITIAL_CASH))
+                    s.add(PaperEquity(date=base, cash=initial, positions_value=0.0, equity=initial, benchmark_close=float(ref.loc[base_idx[-1]])))
+                    s.flush()
+                    if last_mark is None:
+                        last_mark = s.get(PaperEquity, base)
             dates = ref.index[ref.index > pd.Timestamp(last_mark.date)] if last_mark else ref.index[-1:]
             for dt in dates:
                 # only the latest mark reflects current holdings exactly; earlier gaps use current positions

@@ -249,7 +249,7 @@ def stock_prices(symbol: str, range: str = "1y") -> dict[str, Any]:
     age = last_bar_age_days(df)
     return {
         "symbol": sym, "source": "Yahoo Finance chart endpoint (unofficial)", "freshness": "end_of_day",
-        "freshness_note": "Daily bars, delayed. Prices are split-adjusted; the latest bar may be incomplete during market hours.",
+        "freshness_note": "Daily bars of completed sessions only, delayed. Prices are split-adjusted; a session still in progress is not shown.",
         "last_bar": df.index[-1].date().isoformat(), "last_bar_age_business_days": age, "stale": age > 4,
         "dates": [x.date().isoformat() for x in d.index],
         "ohlcv": {k: [_nan_none(float(v)) for v in d[k]] for k in ("open", "high", "low", "close", "volume")},

@@ -75,8 +75,9 @@ def analyze(positions: pd.DataFrame, adj: pd.DataFrame, bench: pd.Series | None,
     out: dict[str, Any] = {
         "empty": False, "equity": equity, "cash": cash, "cash_weight": cash / equity if equity else None,
         "n_positions": int(len(w)), "gross_exposure": float(w.sum()),
-        "concentration": {"largest_weight": float(w.max()), "top5_weight": float(w.nlargest(5).sum()), "hhi": float((w ** 2).sum()),
-                          "effective_positions": float(1.0 / (w ** 2).sum()) if (w ** 2).sum() > 0 else None},
+        "concentration": {"largest_weight": float(w.max()), "top5_weight": float(w.nlargest(5).sum()), "hhi": float(((w / w.sum()) ** 2).sum()),
+                          # concentration among invested positions (weights renormalised to exclude cash)
+                          "effective_positions": float(1.0 / ((w / w.sum()) ** 2).sum()) if w.sum() > 0 else None},
         "sector_exposure": [{"sector": k, "weight": float(v)} for k, v in sector_w.items()],
         "volatility": M.ann_vol(port), "max_drawdown": M.max_drawdown(port), "calmar": M.calmar(port),
         "var_95": M.var_cvar(port, 0.95), "var_99": M.var_cvar(port, 0.99),
