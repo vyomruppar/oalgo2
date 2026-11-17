@@ -30,7 +30,7 @@ def test_health_and_overview(client):
     o = client.get("/api/overview").json()
     assert o["universe"]["listed"] == 2 and o["universe"]["eligible_listings"] == 1
     assert o["top"][0]["symbol"] == "AAA" and "real-time" in o["data_freshness"]
-    assert {p["key"] for p in o["providers"]} == {"nasdaq_trader", "sec_edgar", "yahoo", "ken_french", "fred"}
+    assert {p["key"] for p in o["providers"]} == {"nasdaq_trader", "sec_edgar", "yahoo", "yahoo_news", "ken_french", "fred"}
 
 
 def test_stock_endpoints(client):

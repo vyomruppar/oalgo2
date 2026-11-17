@@ -30,6 +30,7 @@ COMPONENT_LABELS = {
     "technical": "Technical trend state",
     "market": "Market conditions",
     "ml": "Machine-learning ranking (validated models only)",
+    "sentiment": "News headline sentiment (needs validation; weight 0 by default)",
 }
 FACTOR_COMPONENTS = ["value", "quality", "momentum", "earnings", "low_vol", "investment", "financial_strength"]
 
@@ -37,7 +38,7 @@ FACTOR_COMPONENTS = ["value", "quality", "momentum", "earnings", "low_vol", "inv
 class ScoreConfig(BaseModel):
     weights: dict[str, float] = Field(default_factory=lambda: {
         "value": 20.0, "quality": 15.0, "momentum": 20.0, "earnings": 10.0, "low_vol": 10.0,
-        "investment": 5.0, "financial_strength": 5.0, "technical": 10.0, "market": 5.0, "ml": 0.0,
+        "investment": 5.0, "financial_strength": 5.0, "technical": 10.0, "market": 5.0, "ml": 0.0, "sentiment": 0.0,
     })
     strong_buy: float = 80.0
     buy: float = 68.0
@@ -70,7 +71,8 @@ def technical_component(row: pd.Series) -> tuple[float, list[dict[str, Any]]]:
     return (float(np.mean(vals)) * 100.0 if vals else float("nan")), checks
 
 
-def score_universe(cross: pd.DataFrame, cfg: ScoreConfig, regime: str, ml_rank: pd.Series | None = None) -> pd.DataFrame:
+def score_universe(cross: pd.DataFrame, cfg: ScoreConfig, regime: str, ml_rank: pd.Series | None = None,
+                   sentiment: pd.Series | None = None) -> pd.DataFrame:
     """Score one cross-section of SCREENED stocks (index = symbol)."""
     fs = factor_scores(cross)
     comp = pd.DataFrame(index=cross.index)
@@ -82,6 +84,8 @@ def score_universe(cross: pd.DataFrame, cfg: ScoreConfig, regime: str, ml_rank: 
     comp["technical"] = [t[0] for t in tech]
     comp["market"] = REGIME_COMPONENT_SCORE.get(regime, 50.0)
     comp["ml"] = percentile(ml_rank.reindex(cross.index)) if ml_rank is not None else np.nan
+    # headline sentiment maps -1..+1 onto 0..100 directly (few stocks have news, so no cross-sectional rank)
+    comp["sentiment"] = ((sentiment.reindex(cross.index).astype(float) + 1.0) * 50.0) if sentiment is not None else np.nan
     w = pd.Series({k: v for k, v in cfg.weights.items() if v > 0 and k in comp.columns})
     vals = comp[w.index]
     wmat = vals.notna().mul(w, axis=1)

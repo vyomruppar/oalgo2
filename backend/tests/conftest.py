@@ -19,8 +19,11 @@ def tmp_env(tmp_path, monkeypatch):
     """Isolated data directory + fresh SQLite database for tests that touch persistence."""
     monkeypatch.setenv("OALGO_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("OALGO_SCHEDULER_ENABLED", "false")
+    monkeypatch.setenv("OALGO_SENTIMENT_ENGINE", "lexicon")      # tests never download or load a model
     from app import config, db
+    from app.research import sentiment
     config.get_settings.cache_clear()
+    sentiment.reset_engine()
     db.init_db()
     yield tmp_path
     config.get_settings.cache_clear()

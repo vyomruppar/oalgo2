@@ -145,6 +145,36 @@ class PaperEquity(Base):
     benchmark_close: Mapped[float | None] = mapped_column(Float, nullable=True)
 
 
+class Holding(Base):
+    """A lot of a security the user actually owns. TRACKING ONLY: recording a holding never creates an order."""
+    __tablename__ = "holdings"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    symbol: Mapped[str] = mapped_column(String(16), index=True)
+    shares: Mapped[float] = mapped_column(Float)
+    cost: Mapped[float] = mapped_column(Float)            # price paid per share, as of the purchase date
+    purchase_date: Mapped[str] = mapped_column(String(10))
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class NewsItem(Base):
+    __tablename__ = "news_items"
+    __table_args__ = (UniqueConstraint("uuid", "symbol"),)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    uuid: Mapped[str] = mapped_column(String(64), index=True)
+    symbol: Mapped[str] = mapped_column(String(16), index=True)   # the stock this headline was retrieved for
+    title: Mapped[str] = mapped_column(Text)
+    publisher: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    link: Mapped[str | None] = mapped_column(Text, nullable=True)
+    published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    related: Mapped[list[str]] = mapped_column(JSON, default=list)
+    relevance: Mapped[float] = mapped_column(Float, default=1.0)
+    sentiment: Mapped[float | None] = mapped_column(Float, nullable=True)        # -1 (negative) .. +1 (positive)
+    sentiment_label: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    engine: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 _engine = None
 _Session: sessionmaker[Session] | None = None
 

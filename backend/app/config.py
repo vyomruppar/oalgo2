@@ -31,6 +31,9 @@ class Settings(BaseSettings):
     scan_cron_hour_utc: int = 22  # after the US close
     scan_cron_minute: int = 30
 
+    # Headline sentiment: auto = FinBERT if the optional "ai" group is installed, else the word list
+    sentiment_engine: str = "auto"   # auto | finbert | lexicon
+
     # Optional e-mail notifications
     smtp_host: str | None = None
     smtp_port: int = 587
@@ -53,6 +56,10 @@ class Settings(BaseSettings):
     @property
     def fundamentals_dir(self) -> Path:
         return self.data_dir / "fundamentals"
+
+    @property
+    def models_dir(self) -> Path:
+        return self.data_dir / "models"
 
     def ensure_dirs(self) -> None:
         for d in (self.data_dir, self.cache_dir, self.prices_dir, self.fundamentals_dir):

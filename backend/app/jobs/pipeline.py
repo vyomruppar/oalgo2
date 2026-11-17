@@ -27,9 +27,11 @@ from ..data.validate import validate_prices
 from ..data.yahoo import INDEX_SYMBOLS, YahooPrices, last_bar_age_days
 from ..db import PaperPosition, PaperTrade, ScanRun, ScoreHistory, Security, StockResult, kv_get, kv_set, session, utcnow
 from ..paper import ledger
+from ..portfolio import holdings
 from ..research import indicators as ind
 from ..research import ml
 from ..research.factors import FACTOR_DEFS, panel_factor_scores
+from ..research import news_service
 from ..research.fundamentals import build_snapshots
 from ..research.panel import build_matrices, build_panel, forward_returns, month_end_dates
 from ..research.regime import breadth_series, current_regime
@@ -125,6 +127,7 @@ class Scan:
             held = [p.symbol for p in s.scalars(select(PaperPosition)).all()]
             # stocks with a pending paper order must stay in the scan so the order can fill
             held += [t.symbol for t in s.scalars(select(PaperTrade).where(PaperTrade.status == "pending")).all() if t.symbol not in held]
+        held += [h for h in holdings.symbols() if h not in held]     # stocks the user owns are always researched
         self.stats["liquidity_ranked"] = len(ranked)
         pick = ranked[: self.max_symbols]
         return pick + [h for h in held if h not in pick]
@@ -260,6 +263,7 @@ class Scan:
                                "listing_source": x.listing_source, "listing_as_of": x.listing_as_of.isoformat() if x.listing_as_of else None}
                     for x in s.scalars(select(Security).where(Security.symbol.in_(list(prices)))).all()}
             held = {p.symbol: p.avg_cost for p in s.scalars(select(PaperPosition)).all()}
+        held = {**held, **holdings.average_costs()}
         sectors = {k: v["sector"] for k, v in secs.items()}
         calendar = idx["SP500"].index
         pm = build_matrices(prices, calendar)
@@ -284,7 +288,7 @@ class Scan:
         extra, atr, issues, ages = {}, {}, {}, {}
         for sym, df in prices.items():
             iv = ind.compute_all(df).iloc[-1]
-            extra[sym] = {"macd_hist": iv["macd_hist"], "rsi_14": iv["rsi_14"]}
+            extra[sym] = {"macd_hist": iv["macd_hist"], "rsi_14": iv["rsi_14"], "bb_z": iv["bb_z"], "bb_pct_b": iv["bb_pct_b"]}
             atr[sym] = float(iv["atr_14"]) if np.isfinite(iv["atr_14"]) else None
             issues[sym] = validate_prices(df)
             ages[sym] = last_bar_age_days(df)
@@ -347,7 +351,12 @@ class Scan:
             ml_rank = pd.Series(r) if r else None
         # ---- scoring ----------------------------------------------------------------------------------
         self.stage("scoring", 0.90)
-        scored = score_universe(cross.loc[passed], score_cfg, regime["regime"], ml_rank) if len(passed) >= 10 else pd.DataFrame()
+        try:    # sentiment from headlines already stored (this scan's headlines are fetched after scoring)
+            prior = news_service.sentiment_by_symbol(passed)
+            sent = pd.Series({k: v["score"] for k, v in prior.items() if v.get("score") is not None and v.get("n", 0) >= 3}, dtype=float)
+        except Exception:
+            sent = pd.Series(dtype=float)
+        scored = score_universe(cross.loc[passed], score_cfg, regime["regime"], ml_rank, sent if len(sent) else None) if len(passed) >= 10 else pd.DataFrame()
         perf = None
         if bt and "multifactor" in bt.get("results", {}):
             m = bt["results"]["multifactor"]
@@ -403,6 +412,8 @@ class Scan:
                 oldp = old_payloads.get(sym)
                 if oldp and latest_periodic and (oldp.get("latest_filing") or {}).get("accession") not in (None, latest_periodic["accession"]):
                     payload["new_filing"] = latest_periodic
+                payload["technicals"] = {k: (float(row[k]) if np.isfinite(row.get(k, np.nan)) else None)
+                                         for k in ("rsi_14", "bb_z", "bb_pct_b", "macd_hist", "ret_1m", "ret_1d", "vol_63", "dist_52w_high")}
                 payload = _clean(payload)
                 counts[sig or "SCREENED_OUT"] = counts.get(sig or "SCREENED_OUT", 0) + 1
                 res = old_rows.get(sym)
@@ -420,6 +431,18 @@ class Scan:
             new_payloads = {sym: s.get(StockResult, sym).payload for sym in screen}
         self.stats["signals"] = counts
         self.stats["price_as_of"] = str(last.date())
+        # ---- news and headline sentiment for owned and actionable stocks ---------------------------------
+        self.stage("news", 0.94)
+        sentiments: dict[str, dict[str, Any]] = {}
+        try:
+            want = [s_ for s_ in new_payloads if s_ in held or new_payloads[s_].get("signal") in ("STRONG BUY", "BUY", "WATCHLIST")]
+            want = sorted(want, key=lambda s_: (s_ not in held, -(new_payloads[s_].get("score") or 0)))[:60]
+            if self.fetch and want:
+                self.stats["news"] = news_service.refresh({s_: secs.get(s_, {}).get("name") for s_ in want})
+            sentiments = news_service.sentiment_by_symbol(list(new_payloads))
+        except Exception as e:
+            log.exception("news refresh failed")
+            self.stats["news"] = f"failed: {e}"
         # ---- paper ledger marks and alerts --------------------------------------------------------------
         self.stage("alerts", 0.96)
         try:
@@ -429,6 +452,9 @@ class Scan:
         n_alerts = 0
         for sym, p in new_payloads.items():
             n_alerts += len(alerts.evaluate_stock(sym, old_payloads.get(sym), p, score_cfg.score_change_alert, first_scan, sym in held))
+        for sym in held:
+            if alerts.evaluate_sentiment(sym, sentiments.get(sym), new_payloads.get(sym, {}).get("company")):
+                n_alerts += 1
         if alerts.evaluate_regime(old_regime, regime):
             n_alerts += 1
         self.stats["alerts_generated"] = n_alerts

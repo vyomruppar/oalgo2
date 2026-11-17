@@ -131,6 +131,23 @@ def evaluate_stock(symbol: str, old: dict[str, Any] | None, new: dict[str, Any],
     return [i for i in ids if i is not None]
 
 
+def evaluate_sentiment(symbol: str, agg: dict[str, Any] | None, company: str | None = None) -> int | None:
+    """Notify when recent headlines for a stock the user owns turn clearly negative (or back)."""
+    if not agg or agg.get("score") is None or agg.get("n", 0) < 3:
+        return None
+    bucket = "negative" if agg["score"] <= -0.35 else "positive" if agg["score"] >= 0.35 else "neutral"
+    key = f"sentiment:{symbol}"
+    with session() as s:
+        last = s.scalars(select(Alert).where(Alert.dedup_key == key).order_by(Alert.id.desc()).limit(1)).first()
+    if bucket != "negative" and last is None:
+        return None      # only start a thread on negative news; later changes are reported
+    c = agg["counts"]
+    return emit("sentiment", symbol, f"News tone for {symbol} is {bucket}",
+                f"{agg['n']} recent headlines for {company or symbol}: {c['positive']} positive, {c['neutral']} neutral, "
+                f"{c['negative']} negative (weighted score {agg['score']:+.2f}). Headline tone only; not a forecast.",
+                {"bucket": bucket}, "medium" if bucket == "negative" else "info", {"sentiment": agg}, key=key)
+
+
 def evaluate_regime(old: dict[str, Any] | None, new: dict[str, Any]) -> int | None:
     if old and old.get("regime") and old["regime"] != new.get("regime") and new.get("regime") != "unknown":
         return emit("regime_change", None, f"Market regime: {old['regime'].replace('_', '-')} -> {new['regime'].replace('_', '-')}",

@@ -27,6 +27,9 @@ from ..db import Alert, PaperPosition, ProviderHealth, ScanRun, ScoreHistory, Se
 from ..jobs import pipeline, scheduler
 from ..jobs.events import bus, sse_format
 from ..paper import ledger
+from ..portfolio import holdings
+from ..research import news_service, sentiment
+from ..research.regime import regime_series
 from ..research import indicators as ind
 from ..research.scoring import COMPONENT_LABELS, ScoreConfig
 from ..risk import portfolio as risk
@@ -43,6 +46,8 @@ PROVIDERS = [
      "cost": "free", "limits": "10 requests/second; us-gaap taxonomy only in this stage (IFRS filers have no fundamentals)."},
     {"key": "yahoo", "name": "Yahoo Finance chart endpoint (unofficial)", "use": "daily prices, dividends, splits, indexes", "freshness": "end of day / delayed",
      "cost": "free", "limits": "Unofficial and rate limited; personal research use; no delisted securities (survivorship bias); not real-time."},
+    {"key": "yahoo_news", "name": "Yahoo Finance search endpoint (unofficial)", "use": "news headlines for sentiment", "freshness": "minutes to hours",
+     "cost": "free", "limits": "Unofficial; headlines only, no article text; includes round-ups that merely mention the ticker."},
     {"key": "ken_french", "name": "Ken French Data Library", "use": "risk-free rate and factor returns", "freshness": "monthly update, about two months lag",
      "cost": "free", "limits": "Research benchmarks only."},
     {"key": "fred", "name": "FRED", "use": "Treasury yields", "freshness": "daily, one-day lag", "cost": "free", "limits": "Macro series only."},
@@ -457,6 +462,208 @@ def position_size(symbol: str, risk_budget: float = Query(0.01, gt=0, le=0.05), 
     out.update({"symbol": sym, "price": r.price, "equity": snap["equity"],
                 "method": "weight = risk budget / one-month volatility, capped by maximum weight and 5% of average daily dollar volume"})
     return out
+
+
+# ---- real holdings (tracking only) --------------------------------------------------------------------
+class HoldingRequest(BaseModel):
+    symbol: str = Field(min_length=1, max_length=12)
+    shares: float = Field(gt=0)
+    cost: float = Field(ge=0)
+    purchase_date: str
+    note: str | None = Field(None, max_length=300)
+
+
+class HoldingUpdate(BaseModel):
+    shares: float = Field(gt=0)
+    cost: float = Field(ge=0)
+    purchase_date: str
+    note: str | None = Field(None, max_length=300)
+
+
+class CsvImport(BaseModel):
+    csv: str = Field(max_length=200_000)
+
+
+def _research_map(symbols: list[str]) -> dict[str, dict[str, Any]]:
+    with session() as s:
+        res = {r.symbol: {"company": (r.payload or {}).get("company"), "sector": (r.payload or {}).get("sector"), "signal": r.signal,
+                          "score": r.score, "risk": (r.payload or {}).get("risk") or {}}
+               for r in s.scalars(select(StockResult).where(StockResult.symbol.in_(symbols))).all()}
+        for sec in s.scalars(select(Security).where(Security.symbol.in_(symbols))).all():
+            res.setdefault(sec.symbol, {"company": sec.name, "sector": sec.sector, "signal": None, "score": None, "risk": {}})
+            res[sec.symbol]["company"] = res[sec.symbol]["company"] or sec.name
+    return res
+
+
+def _holdings_summary() -> dict[str, Any]:
+    syms = holdings.symbols()
+    out = holdings.summary(YahooPrices().load, _research_map(syms))
+    sent = news_service.sentiment_by_symbol(syms) if syms else {}
+    for p in out["positions"]:
+        p["sentiment"] = sent.get(p["symbol"])
+    return pipeline._clean(out)
+
+
+@app.get("/api/holdings")
+def get_holdings() -> dict[str, Any]:
+    return _holdings_summary()
+
+
+def _ensure_prices(sym: str) -> None:
+    """A newly recorded holding may not have been scanned yet: fetch its history once so it can be valued."""
+    y = YahooPrices()
+    if y.load(sym) is None:
+        try:
+            y.fetch(sym)
+        except Exception as e:
+            log.warning("could not fetch prices for new holding %s: %s", sym, e)
+
+
+@app.post("/api/holdings", status_code=201)
+def add_holding(req: HoldingRequest) -> dict[str, Any]:
+    """Records a lot the user already owns. This is bookkeeping: no order of any kind is created."""
+    try:
+        hid = holdings.add(req.symbol, req.shares, req.cost, req.purchase_date, req.note)
+    except holdings.HoldingError as e:
+        raise HTTPException(400, str(e)) from e
+    _ensure_prices(_sym(req.symbol))
+    bus.publish("portfolio", {"holding_id": hid})
+    return {"id": hid}
+
+
+@app.put("/api/holdings/{holding_id}")
+def edit_holding(holding_id: int, req: HoldingUpdate) -> dict[str, Any]:
+    try:
+        holdings.update(holding_id, req.shares, req.cost, req.purchase_date, req.note)
+    except holdings.HoldingError as e:
+        raise HTTPException(404 if "not found" in str(e) else 400, str(e)) from e
+    bus.publish("portfolio", {"holding_id": holding_id})
+    return {"saved": True}
+
+
+@app.delete("/api/holdings/{holding_id}")
+def remove_holding(holding_id: int) -> dict[str, Any]:
+    if not holdings.delete(holding_id):
+        raise HTTPException(404, "holding not found")
+    bus.publish("portfolio", {"holding_id": holding_id})
+    return {"deleted": True}
+
+
+@app.post("/api/holdings/import")
+def import_holdings(req: CsvImport) -> dict[str, Any]:
+    out = holdings.import_csv(req.csv)
+    if out["errors"]:
+        raise HTTPException(400, "; ".join(out["errors"][:8]))
+    for sym in holdings.symbols():
+        _ensure_prices(sym)
+    bus.publish("portfolio", {"imported": out["imported"]})
+    return out
+
+
+@app.get("/api/holdings/history")
+def holdings_history(range: str = "all") -> dict[str, Any]:
+    y = YahooPrices()
+    spy = y.load("SPY")
+    return holdings.history(y.load, spy["adj_close"] if spy is not None else None, range)
+
+
+@app.get("/api/holdings/risk")
+def holdings_risk() -> dict[str, Any]:
+    y = YahooPrices()
+    summ = holdings.summary(y.load, _research_map(holdings.symbols()))
+    pos = [p for p in summ["positions"] if p["price"] is not None]
+    if not pos:
+        return {"empty": True, "message": "No priced holdings to analyse.", "label": "your holdings"}
+    frames = {p["symbol"]: y.load(p["symbol"]) for p in pos}
+    positions = pd.DataFrame({"quantity": {p["symbol"]: p["shares"] for p in pos}, "price": {p["symbol"]: p["price"] for p in pos}})
+    adj = pd.DataFrame({k: v["adj_close"] for k, v in frames.items()})
+    spy = y.load("SPY")
+    rmap = _research_map(list(frames))
+    out = risk.analyze(positions, adj, spy["adj_close"] if spy is not None else None,
+                       {k: (v.get("sector") or "Unknown") for k, v in rmap.items()},
+                       {k: v["risk"].get("atr_14") for k, v in rmap.items()}, {k: v["risk"].get("adv_dollar_63") for k, v in rmap.items()}, 0.0)
+    out["label"] = "your holdings; historical simulation at current weights"
+    return pipeline._clean(out)
+
+
+# ---- news and sentiment -------------------------------------------------------------------------------
+@app.get("/api/news")
+def news(symbol: str | None = None, scope: str = "holdings", limit: int = Query(60, le=300), min_relevance: float = 0.0) -> dict[str, Any]:
+    if symbol:
+        syms: list[str] | None = [_sym(symbol)]
+    elif scope == "holdings":
+        syms = holdings.symbols()
+    else:
+        syms = None
+    items = news_service.items_for(syms, limit=limit * 3, min_relevance=min_relevance) if syms is None or syms else []
+    return {"engine": sentiment.engine_status(), "scope": symbol or scope, "items": news_service.public(items)[:limit],
+            "sentiment": pipeline._clean(news_service.sentiment_by_symbol(syms) if syms is None or syms else {}),
+            "source": "Yahoo Finance search endpoint (unofficial); headlines only"}
+
+
+@app.post("/api/news/refresh")
+def news_refresh(symbol: str | None = None) -> dict[str, Any]:
+    syms = [_sym(symbol)] if symbol else holdings.symbols()
+    if not syms:
+        return {"new": 0, "failed": 0, "symbols": 0}
+    with session() as s:
+        names = {x.symbol: x.name for x in s.scalars(select(Security).where(Security.symbol.in_(syms))).all()}
+    if not names:
+        raise HTTPException(404, "not a verified NYSE/NASDAQ listing")
+    return news_service.refresh(names, ttl_seconds=300.0)
+
+
+# ---- dashboard and quant-lab data ---------------------------------------------------------------------
+@app.get("/api/dashboard")
+def dashboard() -> dict[str, Any]:
+    """Everything the Command page needs in one call: holdings, the star map of the scanned universe, regime."""
+    held = set(holdings.symbols())
+    with session() as s:
+        stars = []
+        for r in s.scalars(select(StockResult)).all():
+            p = r.payload or {}
+            stars.append({"symbol": r.symbol, "company": p.get("company"), "sector": p.get("sector") or "Unknown", "score": r.score,
+                          "signal": r.signal, "price": r.price, "market_cap": (p.get("fundamentals") or {}).get("market_cap"),
+                          "ret_1d": (p.get("unusual") or {}).get("ret_1d"), "held": r.symbol in held, "screen_pass": r.screen_pass})
+        last_ok = s.scalars(select(ScanRun).where(ScanRun.status == "ok").order_by(ScanRun.id.desc()).limit(1)).first()
+        unread = s.scalar(select(func.count()).select_from(Alert).where(Alert.read.is_(False))) or 0
+        recent = s.scalars(select(Alert).order_by(Alert.id.desc()).limit(8)).all()
+        return {"holdings": _holdings_summary(), "stars": stars, "regime": kv_get("regime"),
+                "scan": {"running": pipeline.is_running(), "last_success": _scan_dict(last_ok)},
+                "unread_alerts": unread, "recent_alerts": [alerts.to_dict(a) for a in recent],
+                "engine": sentiment.engine_status(), "disclaimer": DISCLAIMER}
+
+
+@app.get("/api/lab/mean-reversion")
+def lab_mean_reversion() -> dict[str, Any]:
+    """Cross-section of short-term stretch: Bollinger z-score, RSI and one-month return for every scored stock."""
+    with session() as s:
+        rows = []
+        for r in s.scalars(select(StockResult).where(StockResult.score.is_not(None))).all():
+            t = (r.payload or {}).get("technicals") or {}
+            if t.get("bb_z") is None or t.get("rsi_14") is None:
+                continue
+            rows.append({"symbol": r.symbol, "company": (r.payload or {}).get("company"), "sector": (r.payload or {}).get("sector"),
+                         "bb_z": t["bb_z"], "rsi_14": t["rsi_14"], "ret_1m": t.get("ret_1m"), "ret_1d": t.get("ret_1d"),
+                         "score": r.score, "signal": r.signal})
+    return {"as_of": (kv_get("regime") or {}).get("as_of"), "items": rows,
+            "note": "A stretched reading is a description, not a trade signal: in the backtests here the short-term reversal strategy "
+                    "did not beat the equal-weight universe after costs."}
+
+
+@app.get("/api/lab/regime-history")
+def lab_regime_history(years: int = Query(5, ge=1, le=12)) -> dict[str, Any]:
+    y = YahooPrices()
+    spx, vix = y.load("^GSPC"), y.load("^VIX")
+    if spx is None:
+        return {"available": False}
+    rs = regime_series(spx["close"], vix["close"] if vix is not None else None).dropna(subset=["score"]).tail(252 * years)
+    counts = rs["regime"].value_counts(normalize=True).to_dict()
+    return {"available": True, "method": "rule-based: trend, volatility percentile, VIX level (index data only)",
+            "dates": [d.date().isoformat() for d in rs.index], "close": [round(float(v), 2) for v in rs["close"]],
+            "score": [float(v) for v in rs["score"]], "regime": list(rs["regime"]),
+            "realized_vol": [None if not np.isfinite(v) else round(float(v), 4) for v in rs["realized_vol_21"]],
+            "share_of_days": {k: float(v) for k, v in counts.items()}}
 
 
 # ---- alerts -------------------------------------------------------------------------------------------
