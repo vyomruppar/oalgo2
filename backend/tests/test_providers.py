@@ -8,7 +8,7 @@ from app.data.fred import parse_fred_csv
 from app.data.french import parse_french_csv
 from app.data.sec import norm_ticker, parse_submissions, parse_tickers_exchange, sic_to_sector
 from app.data.validate import validate_prices
-from app.data.yahoo import parse_chart, parse_spark
+from app.data.yahoo import last_completed_session, parse_chart, parse_spark
 from tests.conftest import make_prices
 
 AFTER_CLOSE = datetime(2026, 11, 20, 23, 0, tzinfo=timezone.utc)
@@ -89,3 +89,38 @@ def test_validate_prices_flags_problems():
     bad.iloc[100, bad.columns.get_loc("adj_close")] *= 3.0
     assert "extreme_move" in {i["code"] for i in validate_prices(bad, now=now)}
     assert validate_prices(df.iloc[0:0])[0]["code"] == "empty"
+
+
+def test_last_completed_session():
+    from datetime import date
+    utc = timezone.utc
+    assert last_completed_session(datetime(2026, 11, 17, 3, 0, tzinfo=utc)) == date(2026, 11, 16)    # Monday evening in New York
+    assert last_completed_session(datetime(2026, 11, 16, 15, 0, tzinfo=utc)) == date(2026, 11, 13)   # Monday, session open
+    assert last_completed_session(datetime(2026, 11, 16, 21, 10, tzinfo=utc)) == date(2026, 11, 13)  # closed 10 minutes ago
+    assert last_completed_session(datetime(2026, 11, 16, 21, 30, tzinfo=utc)) == date(2026, 11, 16)
+    assert last_completed_session(datetime(2026, 11, 15, 18, 0, tzinfo=utc)) == date(2026, 11, 13)   # Sunday
+
+
+def test_price_cache_is_refetched_when_a_newer_session_exists(tmp_env, monkeypatch, fixtures):
+    """A price file written before today's close must not be reused after the close."""
+    import os, time
+    from app.data import yahoo as y
+    from app.data.http import Fetched
+    prov = y.YahooPrices()
+    old, _ = parse_chart((fixtures / "yahoo_chart_aapl.json").read_bytes(), now=AFTER_CLOSE)     # last bar 2026-11-13
+    old.to_parquet(prov.path("AAPL"))
+    two_hours_ago = time.time() - 2 * 3600
+    os.utime(prov.path("AAPL"), (two_hours_ago, two_hours_ago))
+    calls = []
+
+    def fake_get(url, ttl_seconds=None, allow_stale_on_error=True):
+        calls.append(url)
+        return Fetched((fixtures / "yahoo_chart_aapl.json").read_bytes(), time.time(), False)
+
+    monkeypatch.setattr(prov.http, "get", fake_get)
+    monkeypatch.setattr(y, "last_completed_session", lambda now=None: pd.Timestamp("2026-11-13").date())
+    prov.fetch("AAPL")
+    assert calls == []                                    # already holds the latest completed session
+    monkeypatch.setattr(y, "last_completed_session", lambda now=None: pd.Timestamp("2026-11-16").date())
+    prov.fetch("AAPL")
+    assert len(calls) == 1                                # a newer session exists -> refetch

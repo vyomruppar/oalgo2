@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -120,8 +120,15 @@ class YahooPrices:
     def fetch(self, symbol: str, max_age_hours: float = 18.0) -> pd.DataFrame:
         """Fetch full daily history (re-downloaded whole so split/dividend adjustments stay consistent)."""
         p = self.path(symbol)
-        if p.exists() and time.time() - p.stat().st_mtime < max_age_hours * 3600:
-            return pd.read_parquet(p)
+        if p.exists():
+            age = time.time() - p.stat().st_mtime
+            cached = pd.read_parquet(p)
+            # Reuse the file only if it already holds the latest completed session. File age alone is
+            # not enough: a file written this morning does not contain this afternoon's close.
+            # The one-hour floor stops refetch loops on market holidays, when no new bar will appear.
+            has_latest = len(cached) > 0 and cached.index[-1].date() >= last_completed_session()
+            if age < max_age_hours * 3600 and (has_latest or age < 3600):
+                return cached
         now = int(time.time())
         p1 = now - int(self.st.price_history_years * 365.25 * 86400)
         url = CHART_URL.format(sym=yahoo_symbol(symbol).replace("^", "%5E"), p1=p1, p2=now + 86400)
@@ -131,12 +138,14 @@ class YahooPrices:
         df.to_parquet(p)
         return df
 
-    def liquidity_snapshot(self, symbols: list[str], batch: int = 20) -> dict[str, dict[str, float]]:
+    def liquidity_snapshot(self, symbols: list[str], batch: int = 20, progress=None) -> dict[str, dict[str, float]]:
         out: dict[str, dict[str, float]] = {}
         back = {yahoo_symbol(s): s for s in symbols}
         ys = list(back)
         for i in range(0, len(ys), batch):
             chunk = ys[i:i + batch]
+            if progress is not None and (i // batch) % 10 == 0:
+                progress(i / max(len(ys), 1))
             try:
                 raw = self.http.get(SPARK_URL.format(syms=",".join(chunk)), ttl_seconds=20 * 3600).content
             except ProviderError:
@@ -145,6 +154,18 @@ class YahooPrices:
                 if k in back:
                     out[back[k]] = v
         return out
+
+
+def last_completed_session(now: datetime | None = None) -> "date":
+    """Most recent weekday whose regular session (16:00 New York) ended at least 20 minutes ago.
+    Exchange holidays are not modelled, so on a holiday this returns a date with no bar."""
+    now_ny = (now or datetime.now(timezone.utc)).astimezone(NY)
+    d = now_ny.date()
+    if now_ny.hour * 60 + now_ny.minute < 16 * 60 + 20:
+        d -= timedelta(days=1)
+    while d.weekday() >= 5:
+        d -= timedelta(days=1)
+    return d
 
 
 def last_bar_age_days(df: pd.DataFrame, now: datetime | None = None) -> int:

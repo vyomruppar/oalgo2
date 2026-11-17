@@ -112,7 +112,7 @@ class Scan:
         with session() as s:
             elig = [x.symbol for x in s.scalars(select(Security).where(Security.eligible.is_(True))).all()]
         if self.fetch:
-            liq = self.yahoo.liquidity_snapshot(elig)
+            liq = self.yahoo.liquidity_snapshot(elig, progress=lambda f: self.stage("liquidity", 0.05 + 0.05 * f))
             with session() as s:
                 for sym, v in liq.items():
                     row = s.get(Security, sym)

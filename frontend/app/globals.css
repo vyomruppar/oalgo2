@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: 11 13 16;
+  --panel: 17 20 25;
+  --raised: 24 28 35;
+  --line: 38 44 54;
+  --ink: 226 230 236;
+  --dim: 148 157 170;
+  --faint: 98 107 121;
+  --accent: 214 168 92;
+  --up: 74 190 142;
+  --down: 232 104 104;
+  --warn: 226 176 76;
+  /* System stacks only: the dashboard must work offline and never fetch fonts from a third party. */
+  --font-sans: "Inter", "IBM Plex Sans", "Segoe UI", "Helvetica Neue", Arial;
+  --font-mono: "JetBrains Mono", "IBM Plex Mono", "SF Mono", Menlo, Consolas;
+}
+
+html,
+body {
+  background: rgb(var(--bg));
+  color: rgb(var(--ink));
+}
+
+body {
+  font-feature-settings: "tnum" 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--line)) transparent;
+}
+
+@layer components {
+  .card {
+    @apply rounded-md border border-line bg-panel;
+  }
+  .card-h {
+    @apply flex items-center justify-between gap-3 border-b border-line px-4 py-2.5;
+  }
+  .card-t {
+    @apply text-[11px] font-semibold uppercase tracking-[0.12em] text-dim;
+  }
+  .num {
+    @apply font-mono tabular-nums;
+  }
+  .th {
+    @apply whitespace-nowrap px-3 py-2 text-left text-[10.5px] font-semibold uppercase tracking-[0.1em] text-faint;
+  }
+  .td {
+    @apply whitespace-nowrap px-3 py-1.5 text-[12.5px];
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded border border-line bg-raised px-3 py-1.5 text-xs font-medium text-ink transition-colors hover:border-accent/60 hover:text-accent disabled:cursor-not-allowed disabled:opacity-40;
+  }
+  .btn-primary {
+    @apply border-accent/50 bg-accent/10 text-accent hover:bg-accent/20;
+  }
+  .input {
+    @apply rounded border border-line bg-bg px-2.5 py-1.5 text-xs text-ink outline-none placeholder:text-faint focus:border-accent/60;
+  }
+  .chip {
+    @apply inline-flex items-center rounded-sm border px-1.5 py-[1px] text-[10.5px] font-semibold uppercase tracking-wider;
+  }
+  .seg {
+    @apply inline-flex overflow-hidden rounded border border-line;
+  }
+  .seg > button {
+    @apply border-r border-line px-2.5 py-1 text-[11px] font-medium text-dim last:border-r-0 hover:text-ink;
+  }
+  .seg > button[data-on="true"] {
+    @apply bg-raised text-accent;
+  }
+  .note {
+    @apply text-[11.5px] leading-relaxed text-faint;
+  }
+}
