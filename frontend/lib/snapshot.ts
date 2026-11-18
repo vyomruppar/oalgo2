@@ -14,7 +14,7 @@ const cache = new Map<string, Promise<J>>();
 function load(file: string): Promise<J> {
   let p = cache.get(file);
   if (!p) {
-    p = fetch(`data/${file}`).then((r) => {
+    p = fetch(`/data/${file}`, { cache: "no-cache" }).then((r) => {
       if (!r.ok) throw new SnapshotMissing(`${file} is not part of this snapshot`);
       return r.json();
     });
@@ -73,7 +73,35 @@ function filterNews(all: J, q: URLSearchParams): J {
   return { engine: all.engine, scope: symbol ?? scope, items: items.slice(0, limit), sentiment, source: all.source };
 }
 
-function filterAlerts(all: J, q: URLSearchParams): J {
+// Alerts marked read are remembered in this browser only (the published data cannot be changed).
+const READ_KEY = "oalgo-read-alerts";
+function readIds(): Set<number> {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(READ_KEY) ?? "[]"));
+  } catch {
+    return new Set();
+  }
+}
+export async function markAlertsRead(id?: number): Promise<number> {
+  const all = await load("alerts.json");
+  const ids = readIds();
+  const before = ids.size;
+  for (const a of all.items) if (id == null || a.id === id) ids.add(a.id);
+  try {
+    localStorage.setItem(READ_KEY, JSON.stringify([...ids]));
+  } catch {
+    /* storage blocked: nothing to remember */
+  }
+  return ids.size - before;
+}
+function withReadState(all: J): J {
+  const ids = readIds();
+  const items = all.items.map((a: J) => (ids.has(a.id) ? { ...a, read: true } : a));
+  return { ...all, items, unread: items.filter((a: J) => !a.read).length };
+}
+
+function filterAlerts(raw: J, q: URLSearchParams): J {
+  const all = withReadState(raw);
   const kind = q.get("kind");
   let items: J[] = all.items;
   if (kind) items = items.filter((a) => a.kind === kind);
@@ -90,6 +118,12 @@ export async function snapshotFetch(path: string): Promise<J> {
     "/api/lab/mean-reversion": "mean-reversion.json", "/api/config": "config.json", "/api/providers": "providers.json", "/api/scans": "scans.json",
     "/api/portfolio": "paper.json", "/api/portfolio/risk": "paper-risk.json", "/api/meta": "meta.json",
   };
+  if (route === "/api/overview" || route === "/api/dashboard") {
+    const [d, alerts] = await Promise.all([load(simple[route]), load("alerts.json")]);
+    return { ...d, unread_alerts: withReadState(alerts).unread };
+  }
+  if (route === "/api/listings") return load("listings.json");
+  if (route === "/api/ops-log") return load("ops-log.json").catch(() => ({ entries: [] }));
   if (simple[route]) return load(simple[route]);
   if (route === "/api/holdings/history") return load(`holdings-history-${q.get("range") ?? "all"}.json`);
   if (route === "/api/market/indexes") return load(`indexes-${q.get("range") ?? "1y"}.json`);

@@ -61,7 +61,9 @@ A research and paper-trading workstation. It ranks and explains; it does not pre
 ## Operations
 
 - Run locally, there is no login: anyone who can reach port 3000 can see your holdings and change settings, so keep it on networks you control.
-- Hosted (Vercel + Render), there is one shared password and no per-user accounts. Everyone who knows it sees the same holdings and settings. Sessions last 30 days.
+- Hosted for free (GitHub Actions + Vercel), changes are queued and applied by the next update (about 5 minutes; a scan about 15), paper trading is off, and there is no live activity feed. Data refreshes every weekday and whenever you change something.
+- Hosted on a paid server (Vercel + Render), changes are instant.
+- Either hosted way, there is one shared password and no per-user accounts. Everyone who knows it sees the same holdings and settings. Sessions last 30 days.
 - The research engine's address is public, but it refuses everything except its health check without the shared key that only the dashboard server holds.
 - Desktop notifications require the dashboard to be open in a browser tab; e-mail needs SMTP settings.
 - The scheduler runs inside the backend process; scans happen only while it is running.

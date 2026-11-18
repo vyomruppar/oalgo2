@@ -30,9 +30,9 @@ Open http://localhost:3000 and press **Run scan now**. The dashboard server forw
 
 Optional settings go in `backend/.env` (see `.env.example`). Setting `OALGO_SEC_USER_AGENT` to your own contact string is recommended, as the SEC asks automated clients to identify themselves.
 
-## Hosting on the web
+## Hosting on the web (free)
 
-The dashboard runs on Vercel and the research engine on Render, behind a password. Follow [`docs/deploy.md`](docs/deploy.md): two import screens, four settings, about 15 minutes plus the first build.
+GitHub Actions runs the research engine every weekday and publishes to a password-protected Vercel site. No credit card, no server. Changes you make on the dashboard are applied by the next update, about 5 minutes later. Follow [`docs/deploy.md`](docs/deploy.md): two tokens, five repository secrets, one click.
 
 ## What it does
 

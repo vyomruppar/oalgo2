@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Banner, Card, ErrorBox, Loading, PageTitle, Tag, useApi } from "@/components/ui";
-import { READ_ONLY, send, SNAPSHOT, type J } from "@/lib/api";
+import { NO_WRITES, READ_ONLY, send, type J } from "@/lib/api";
 import { fmtNum, timeAgo, titleCase } from "@/lib/format";
 
 const SCREEN_FIELDS: { key: string; label: string; step: number; scale?: number; unit?: string }[] = [
@@ -44,7 +44,7 @@ export default function Settings() {
     try {
       const r = await send("PUT", "/api/config", { screen, score, scan_max_symbols: size, rescore: true });
       await mutate();
-      setMsg({ ok: true, text: r.rescore_started ? "Saved. Re-screening and re-scoring from stored data now; watch the status bar." : "Saved. A scan is already running, so the new settings apply on the next one." });
+      setMsg({ ok: true, text: r.queued ? r.message : r.rescore_started ? "Saved. Re-screening and re-scoring from stored data now; watch the status bar." : "Saved. A scan is already running, so the new settings apply on the next one." });
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : String(e) });
     } finally {
@@ -63,7 +63,7 @@ export default function Settings() {
       <PageTitle
         title="Settings"
         sub="Screening thresholds, score weights and signal thresholds. Saving re-screens and re-scores every scanned stock from stored data, without downloading anything."
-        right={<div className="flex items-center gap-2"><button className="btn" disabled={!dirty || busy} onClick={revert}>Discard changes</button><button className="btn btn-primary" disabled={!dirty || busy || total <= 0 || SNAPSHOT} title={SNAPSHOT ? READ_ONLY : undefined} onClick={save}>Save and re-score</button></div>}
+        right={<div className="flex items-center gap-2"><button className="btn" disabled={!dirty || busy} onClick={revert}>Discard changes</button><button className="btn btn-primary" disabled={!dirty || busy || total <= 0 || NO_WRITES} title={NO_WRITES ? READ_ONLY : undefined} onClick={save}>Save and re-score</button></div>}
       />
       {msg && <div className={`mb-3 rounded border px-3 py-2 text-xs ${msg.ok ? "border-up/40 bg-up/5 text-up" : "border-down/40 bg-down/5 text-down"}`}>{msg.text}</div>}
 

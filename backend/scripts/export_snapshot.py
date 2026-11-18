@@ -23,10 +23,11 @@ from app.research import news_service, sentiment  # noqa: E402
 
 
 def compact(o: Any) -> Any:
-    """Round floats so the files stay small; values keep more precision than any chart or table shows."""
+    """Round floats to 6 significant digits so the files stay small; more precision than any chart or table shows."""
     if isinstance(o, float):
-        a = abs(o)
-        return round(o, 2) if a >= 1000 else round(o, 4) if a >= 1 else round(o, 6)
+        if o != o or o in (float("inf"), float("-inf")):
+            return None
+        return float(f"{o:.6g}")
     if isinstance(o, dict):
         return {k: compact(v) for k, v in o.items()}
     if isinstance(o, list):
@@ -80,17 +81,21 @@ def main(out: Path) -> None:
                 bundle = {"detail": get(f"/api/stocks/{sym}"), "prices": get(f"/api/stocks/{sym}/prices", range="2y"),
                           "fundamentals": get(f"/api/stocks/{sym}/fundamentals")}
             except Exception as e:  # a stock without stored prices still gets its research page
-                print("skip prices for", sym, e)
+                pass
                 bundle = {"detail": get(f"/api/stocks/{sym}"), "prices": None, "fundamentals": get(f"/api/stocks/{sym}/fundamentals")}
             write(f"stock/{sym}.json", bundle)
             n += 1
+        # every verified, eligible listing: lets the dashboard check a ticker before queueing a holding
+        from app.db import Security, session
+        with session() as s_:
+            write("listings.json", sorted([x.symbol, x.name] for x in s_.query(Security).filter(Security.eligible.is_(True)).all()))
         ov = get("/api/overview")
         last = (ov.get("scan") or {}).get("last_success") or {}
-        write("meta.json", {"snapshot_at": last.get("finished_at"), "price_as_of": (last.get("stats") or {}).get("price_as_of"),
+        from datetime import datetime, timezone
+        write("meta.json", {"exported_at": datetime.now(timezone.utc).isoformat(), "snapshot_at": last.get("finished_at"), "price_as_of": (last.get("stats") or {}).get("price_as_of"),
                             "stocks": n, "note": "Read-only snapshot. Holdings shown are sample data."})
     total = sum(sizes.values())
-    big = sorted(sizes.items(), key=lambda kv: -kv[1])[:6]
-    print(f"{len(sizes)} files, {total / 1e6:.1f} MB; largest: " + ", ".join(f"{k} {v / 1e3:.0f}KB" for k, v in big))
+    print(f"exported {len(sizes)} files, {total / 1e6:.1f} MB")
 
 
 if __name__ == "__main__":

@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Card, Empty, ErrorBox, KV, Loading, PageTitle, Seg, SignalChip, SymbolLink, Tag, useApi } from "@/components/ui";
-import { READ_ONLY, send, SNAPSHOT, type J } from "@/lib/api";
+import { send, SNAPSHOT, type J } from "@/lib/api";
+import { markAlertsRead } from "@/lib/snapshot";
 import { fmtCompact, fmtDateTime, fmtMoney, fmtNum, fmtPct, timeAgo } from "@/lib/format";
 import { useLive } from "@/lib/live";
 
@@ -58,12 +59,16 @@ export default function Alerts() {
   const cfg = useApi("/api/config");
 
   const markAll = async () => {
-    await send("POST", "/api/alerts/read");
+    if (SNAPSHOT) await markAlertsRead();
+    else await send("POST", "/api/alerts/read");
     mutate();
   };
   const toggle = async (a: J) => {
     setOpen(open === a.id ? null : a.id);
-    if (!a.read && !SNAPSHOT) {
+    if (!a.read && SNAPSHOT) {
+      await markAlertsRead(a.id);
+      mutate();
+    } else if (!a.read) {
       await send("POST", `/api/alerts/read?alert_id=${a.id}`);
       mutate();
     }
@@ -77,7 +82,7 @@ export default function Alerts() {
         right={
           <div className="flex items-center gap-2">
             {notifications === "granted" ? <Tag tone="up">Desktop notifications on</Tag> : notifications === "unsupported" ? <Tag>Desktop notifications unsupported</Tag> : notifications === "denied" ? <Tag tone="down">Blocked in browser settings</Tag> : <button className="btn" onClick={enableNotifications}>Enable desktop notifications</button>}
-            <button className="btn" onClick={markAll} disabled={!data?.unread || SNAPSHOT} title={SNAPSHOT ? READ_ONLY : undefined}>Mark all read</button>
+            <button className="btn" onClick={markAll} disabled={!data?.unread} title={SNAPSHOT ? "Remembered in this browser" : undefined}>Mark all read</button>
           </div>
         }
       />

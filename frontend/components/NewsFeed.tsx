@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Empty, Loading, Tag, useApi } from "./ui";
-import { READ_ONLY, send, SNAPSHOT, type J } from "@/lib/api";
+import { NO_WRITES, READ_ONLY, send, type J } from "@/lib/api";
 import { timeAgo } from "@/lib/format";
 
 function ToneBar({ v }: { v: number | null }) {
@@ -50,7 +50,7 @@ export default function NewsFeed({ symbol, scope = "holdings", limit = 12, showR
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <EngineNote engine={data.engine} />
         {showRefresh && (
-          <button className="btn" disabled={busy || SNAPSHOT} title={SNAPSHOT ? READ_ONLY : undefined} onClick={refresh} type="button">
+          <button className="btn" disabled={busy || NO_WRITES} title={NO_WRITES ? READ_ONLY : undefined} onClick={refresh} type="button">
             {busy ? "Fetching headlines" : "Fetch latest headlines"}
           </button>
         )}

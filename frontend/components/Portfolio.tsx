@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import EChart, { C, baseOption, timeAxis, valueAxis, zoom } from "./EChart";
 import { Card, Empty, Loading, ScoreBar, Seg, SentimentBadge, SignalChip, Sparkline, useApi } from "./ui";
-import { READ_ONLY, send, SNAPSHOT, type J } from "@/lib/api";
+import { fetcher, NO_WRITES, QUEUED, READ_ONLY, send, type J } from "@/lib/api";
 import { fmtMoney, fmtNum, fmtPct, signClass } from "@/lib/format";
 
 const RANGES = ["1m", "3m", "6m", "1y", "2y", "all"] as const;
@@ -114,8 +114,8 @@ export function HoldingsEditor({ lots, onChange }: { lots: J[]; onChange: () => 
     setBusy(true);
     setMsg(null);
     try {
-      await fn();
-      setMsg({ ok: true, text: okText });
+      const r = (await fn()) as J;
+      setMsg({ ok: true, text: r?.queued ? r.message : okText });
       onChange();
       return true;
     } catch (e) {
@@ -129,6 +129,12 @@ export function HoldingsEditor({ lots, onChange }: { lots: J[]; onChange: () => 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     const body = { shares: Number(form.shares), cost: Number(form.cost), purchase_date: form.purchase_date, note: form.note || null };
+    if (QUEUED && editing == null) {
+      // changes are applied later, so check the ticker now rather than fail silently
+      const sym = form.symbol.trim().toUpperCase().replace(".", "-");
+      const listed = ((await fetcher("/api/listings").catch(() => [])) as [string, string][]).some(([s]) => s === sym);
+      if (!listed) return setMsg({ ok: false, text: `${sym} is not in the verified NYSE/NASDAQ directory (OTC and other venues are not supported).` });
+    }
     if (!(body.shares > 0) || !(body.cost >= 0) || form.cost === "") return setMsg({ ok: false, text: "Enter the number of shares and the price you paid per share." });
     const ok = editing != null
       ? await run(() => send("PUT", `/api/holdings/${editing}`, body), "Holding updated.")
@@ -168,7 +174,7 @@ export function HoldingsEditor({ lots, onChange }: { lots: J[]; onChange: () => 
           <input className="input mt-1 w-full" maxLength={300} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
         </label>
         <div className="col-span-2 flex items-end gap-2 md:col-span-1">
-          <button className="btn btn-primary" disabled={busy || SNAPSHOT} title={SNAPSHOT ? READ_ONLY : undefined} type="submit">{editing != null ? "Save changes" : "Add holding"}</button>
+          <button className="btn btn-primary" disabled={busy || NO_WRITES} title={NO_WRITES ? READ_ONLY : undefined} type="submit">{editing != null ? "Save changes" : "Add holding"}</button>
           {editing != null && <button className="btn" type="button" onClick={() => { setEditing(null); setForm({ symbol: "", shares: "", cost: "", purchase_date: today(), note: "" }); }}>Cancel</button>}
         </div>
       </form>
@@ -179,7 +185,7 @@ export function HoldingsEditor({ lots, onChange }: { lots: J[]; onChange: () => 
             One lot per line: <span className="num text-ink">ticker,shares,price paid,YYYY-MM-DD,note</span>. Nothing is saved if any line has a problem.
             <textarea className="input num mt-1 h-24 w-full" value={csv} onChange={(e) => setCsv(e.target.value)} placeholder={"AAPL,10,150.25,2024-03-14\nMSFT,4,410,2025-01-09,retirement account"} />
           </label>
-          <button className="btn mt-2" disabled={busy || !csv.trim() || SNAPSHOT} title={SNAPSHOT ? READ_ONLY : undefined} type="button" onClick={async () => { if (await run(() => send("POST", "/api/holdings/import", { csv }), "Holdings imported.")) setCsv(""); }}>Import holdings</button>
+          <button className="btn mt-2" disabled={busy || !csv.trim() || NO_WRITES} title={NO_WRITES ? READ_ONLY : undefined} type="button" onClick={async () => { if (await run(() => send("POST", "/api/holdings/import", { csv }), "Holdings imported.")) setCsv(""); }}>Import holdings</button>
         </div>
       )}
       {lots.length > 0 && (
@@ -196,7 +202,7 @@ export function HoldingsEditor({ lots, onChange }: { lots: J[]; onChange: () => 
                   <td className="td num text-dim">{l.purchase_date}</td>
                   <td className="td max-w-[220px] truncate text-faint">{l.note}</td>
                   <td className="td text-right">
-                    {SNAPSHOT ? null : removing === l.id ? (
+                    {NO_WRITES ? null : removing === l.id ? (
                       <>
                         <button className="mr-3 text-[12px] font-semibold text-down" type="button" onClick={() => { setRemoving(null); run(() => send("DELETE", `/api/holdings/${l.id}`), "Holding removed."); }}>Confirm remove</button>
                         <button className="text-[12px] text-dim hover:text-ink" type="button" onClick={() => setRemoving(null)}>Keep</button>
@@ -214,7 +220,7 @@ export function HoldingsEditor({ lots, onChange }: { lots: J[]; onChange: () => 
           </table>
         </div>
       )}
-      {SNAPSHOT && <p className="mt-2 text-[12px] text-warn">These are sample holdings in a read-only snapshot. To track your own, run the app on your computer.</p>}
+      {NO_WRITES && <p className="mt-2 text-[12px] text-warn">These are sample holdings in a read-only snapshot. To track your own, run the app on your computer.</p>}
       <p className="note mt-2">This is a record of what you already own. Adding or removing a holding here never buys or sells anything.</p>
     </Card>
   );

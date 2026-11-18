@@ -1,0 +1,210 @@
+# Free hosted setup: this workflow is the research engine.
+#   - every weekday after the US close, and whenever the dashboard queues a change, it
+#     applies queued changes, runs the scan (with FinBERT), refreshes headlines and
+#     publishes the results to Vercel behind your password
+#   - its state (database, prices, filings) is kept in the Actions cache, encrypted, because
+#     this repository is public
+# Setup guide: docs/deploy.md
+name: Update
+
+on:
+  schedule:
+    - cron: "17 22 * * 1-5" # 22:17 UTC on weekdays, after the US close
+  workflow_dispatch:
+
+permissions:
+  contents: write # to clear processed changes from the oalgo-queue branch
+
+concurrency:
+  group: oalgo-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      OALGO_DATA_DIR: ${{ github.workspace }}/state
+      OALGO_SCHEDULER_ENABLED: "false"
+      OALGO_SEC_USER_AGENT: ${{ secrets.OALGO_SEC_USER_AGENT }}
+      OALGO_SECRET: ${{ secrets.OALGO_SECRET }}
+      VERCEL_TELEMETRY_DISABLED: "1"
+    steps:
+      - name: Check settings
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+          DASHBOARD_GH_TOKEN: ${{ secrets.DASHBOARD_GH_TOKEN }}
+        run: |
+          missing=""
+          for v in OALGO_SECRET VERCEL_TOKEN APP_PASSWORD DASHBOARD_GH_TOKEN OALGO_SEC_USER_AGENT; do
+            [ -n "${!v}" ] || missing="$missing $v"
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secrets:$missing. See docs/deploy.md."
+            exit 1
+          fi
+          [ ${#OALGO_SECRET} -ge 32 ] || { echo "::error::OALGO_SECRET must be at least 32 characters."; exit 1; }
+
+      - uses: actions/checkout@v4
+
+      - name: Get queued changes
+        run: |
+          if git ls-remote --exit-code --heads origin oalgo-queue >/dev/null; then
+            git fetch --depth 1 origin oalgo-queue
+            git worktree add queue-branch FETCH_HEAD --detach
+          else
+            mkdir -p queue-branch/queue
+          fi
+          mkdir -p queue-branch/queue
+          echo "Queued changes: $(ls queue-branch/queue | grep -c '\.enc$' || true)"
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.32"
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install research engine
+        working-directory: backend
+        run: uv sync --frozen --group ai --quiet
+
+      - name: Derive keys
+        working-directory: backend
+        run: |
+          for pair in STATE_KEY:oalgo2-state-v1 QUEUE_KEY:oalgo2-queue-v1 AUTH_SECRET:oalgo2-auth-v1; do
+            name=${pair%%:*}; purpose=${pair#*:}
+            val=$(uv run --frozen python -c "import os,sys; from app.queue import derive_hex; print(derive_hex(os.environ['OALGO_SECRET'], sys.argv[1]))" "$purpose")
+            echo "::add-mask::$val"
+            echo "$name=$val" >> "$GITHUB_ENV"
+          done
+
+      - name: Restore model
+        id: model
+        uses: actions/cache/restore@v4
+        with:
+          path: state/models
+          key: finbert-v1
+
+      - name: Restore state
+        id: state
+        uses: actions/cache/restore@v4
+        with:
+          path: state.tar.enc
+          key: oalgo-state-${{ github.run_id }}
+          restore-keys: oalgo-state-
+
+      - name: Restore state from backup
+        if: steps.state.outputs.cache-matched-key == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download oalgo-state -p state.tar.enc -R "${{ github.repository }}" 2>/dev/null || echo "No backup found."
+
+      - name: Decrypt state
+        run: |
+          mkdir -p state
+          if [ -f state.tar.enc ]; then
+            openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -pass env:STATE_KEY -in state.tar.enc | tar -xz -C state
+            echo "Restored the previous state."
+          else
+            echo "No previous state: this is the first run."
+          fi
+
+      - name: Apply changes, scan and export
+        working-directory: backend
+        run: |
+          flag=""
+          if [ "${{ github.event_name }}" = "schedule" ] || [ ! -f ../state/oalgo.sqlite ]; then flag="--scheduled"; fi
+          mkdir -p ../frontend/public/data
+          # the log stays private: only a one-line summary is printed, because this log is public
+          if ! uv run --frozen python scripts/ci_run.py --queue ../queue-branch/queue --out ../frontend/public/data $flag > ../ci.log 2>&1; then
+            echo "::error::The update failed ($(tail -n1 ../ci.log | cut -d: -f1 | cut -c1-80)). Nothing was published."
+            exit 1
+          fi
+          tail -n1 ../ci.log
+
+      - name: Encrypt and save state
+        run: |
+          cd state
+          files=$(ls -d oalgo.sqlite oalgo.sqlite-wal oalgo.sqlite-shm prices fundamentals ops-log.json 2>/dev/null)
+          tar -cz $files | openssl enc -aes-256-cbc -pbkdf2 -iter 200000 -salt -pass env:STATE_KEY -out ../state.tar.enc
+          echo "State: $(du -h ../state.tar.enc | cut -f1)"
+
+      - uses: actions/cache/save@v4
+        with:
+          path: state.tar.enc
+          key: oalgo-state-${{ github.run_id }}
+
+      # The Actions cache drops entries unused for 7 days; this encrypted copy in a release does not expire.
+      - name: Back up state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          R="${{ github.repository }}"
+          gh release view oalgo-state -R "$R" >/dev/null 2>&1 || gh release create oalgo-state -R "$R" --prerelease \
+            --title "Encrypted dashboard state (do not delete)" \
+            --notes "Encrypted backup of the dashboard's database, written by the Update workflow. Unreadable without the OALGO_SECRET repository secret. Deleting it after a long pause in updates loses your holdings." >/dev/null
+          gh release upload oalgo-state state.tar.enc --clobber -R "$R"
+
+      - name: Save model
+        if: steps.model.outputs.cache-hit != 'true' && hashFiles('state/models/finbert/model.safetensors') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: state/models
+          key: finbert-v1
+
+      - name: Clear applied changes
+        if: hashFiles('frontend/public/data/processed.txt') != ''
+        run: |
+          [ -s frontend/public/data/processed.txt ] || exit 0
+          cd queue-branch
+          git config user.name "oalgo2 update"
+          git config user.email "actions@users.noreply.github.com"
+          while read -r f; do [ -n "$f" ] && git rm -q --ignore-unmatch "queue/$f"; done < ../frontend/public/data/processed.txt
+          git commit -q -m "Clear applied dashboard changes" || exit 0
+          for i in 1 2 3 4; do
+            git push -q origin HEAD:oalgo-queue && exit 0
+            git fetch -q origin oalgo-queue && git rebase -q FETCH_HEAD || true
+            sleep $((i * 3))
+          done
+          echo "::warning::Could not clear applied changes; they will be skipped as duplicates next time."
+        # processed.txt must not be published
+      - run: rm -f frontend/public/data/processed.txt
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Publish to Vercel
+        working-directory: frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+          GH_DISPATCH_TOKEN: ${{ secrets.DASHBOARD_GH_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          NEXT_PUBLIC_SNAPSHOT: "1"
+          NEXT_PUBLIC_QUEUE: "1"
+        run: |
+          V="npx --yes vercel@65.11.0"
+          PROJECT="${{ vars.VERCEL_PROJECT || 'oalgo2' }}"
+          $V project add "$PROJECT" --token "$VERCEL_TOKEN" >/dev/null 2>&1 || true
+          $V link --yes --project "$PROJECT" --token "$VERCEL_TOKEN" >/dev/null
+          for name in APP_PASSWORD AUTH_SECRET QUEUE_KEY GH_DISPATCH_TOKEN GH_REPO NEXT_PUBLIC_SNAPSHOT NEXT_PUBLIC_QUEUE; do
+            $V env rm "$name" production --yes --token "$VERCEL_TOKEN" >/dev/null 2>&1 || true
+            printf '%s' "${!name}" | $V env add "$name" production --token "$VERCEL_TOKEN" >/dev/null
+          done
+          $V pull --yes --environment=production --token "$VERCEL_TOKEN" >/dev/null
+          $V build --prod --token "$VERCEL_TOKEN" > ../build.log 2>&1 || { tail -n 30 ../build.log | grep -v "public/data"; exit 1; }
+          url=$($V deploy --prebuilt --prod --token "$VERCEL_TOKEN" 2>/dev/null | tail -n1)
+          echo "Published $url"
+          {
+            echo "### Dashboard updated"
+            echo "This deployment: $url"
+            echo "Your permanent address is shown in Vercel under the project's Domains (usually https://$PROJECT.vercel.app)."
+          } >> "$GITHUB_STEP_SUMMARY"

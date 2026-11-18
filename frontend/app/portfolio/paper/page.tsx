@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import EChart, { C, baseOption, catAxis, timeAxis, valueAxis, zoom } from "@/components/EChart";
 import { Banner, Card, Empty, ErrorBox, KV, Loading, PageTitle, Stat, SymbolLink, Tabs, Tag, useApi } from "@/components/ui";
-import { READ_ONLY, send, SNAPSHOT, type J } from "@/lib/api";
+import { NOT_IN_FREE, QUEUED, READ_ONLY, send, SNAPSHOT, type J } from "@/lib/api";
 import { fmtDateTime, fmtMoney, fmtNum, fmtPct, signClass } from "@/lib/format";
 
 export default function Portfolio() {
@@ -117,7 +117,7 @@ export default function Portfolio() {
               <button className="btn" onClick={() => setConfirmReset(false)}>Keep it</button>
             </>
           ) : (
-            <button className="btn" disabled={busy || SNAPSHOT} title={SNAPSHOT ? READ_ONLY : undefined} onClick={() => setConfirmReset(true)}>Reset paper portfolio</button>
+            <button className="btn" disabled={busy || SNAPSHOT} title={SNAPSHOT ? (QUEUED ? NOT_IN_FREE : READ_ONLY) : undefined} onClick={() => setConfirmReset(true)}>Reset paper portfolio</button>
           )}</div>}
       />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">

@@ -1,83 +1,102 @@
-# Deploying to the web
+# Putting it on the web for free
 
-The platform has two parts, hosted in two places:
+Everything runs on two free services, with no credit card:
 
-| Part | What it does | Where | Why there |
-|---|---|---|---|
-| Dashboard (`frontend/`) | Every page you see, the sign-in, and a private relay to the research engine | Vercel | Built for Next.js, free tier is enough |
-| Research engine (`backend/`) | Scans, the daily scheduler, the database, news and FinBERT sentiment | Render | Needs an always-on server, a disk and up to 2 GB of memory, which Vercel does not offer |
+| Part | Runs on | What it does |
+|---|---|---|
+| Research engine | **GitHub Actions** (free for public repositories) | Every weekday after the US close, and whenever you change something on the dashboard: applies your changes, scans about 300 stocks, scores headlines with FinBERT, then publishes the results |
+| Dashboard | **Vercel** (free Hobby plan) | Shows every page behind your password, and passes your changes to GitHub |
 
-Your browser only talks to Vercel. The research engine answers nothing except its health check unless the request carries a secret key that only the Vercel server knows, so the dashboard's password is the one lock.
+Your repository is public, so nothing private is stored in it in readable form. The engine's database (your holdings included) is encrypted with a secret only you hold, and so is every change you make on the dashboard while it waits to be applied. Run logs show counts only.
 
-Set up Render first, because Vercel needs two values from it.
+## What is different from running it on your computer
 
-## 1. Research engine on Render (about 10 minutes, plus the first build)
+- **Changes are not instant.** Adding a holding, saving settings or fetching headlines is queued and applied by the next update, which takes about 5 minutes. "Run scan now" takes about 15. The status bar shows when an update is running and offers a reload when new data is ready.
+- **Paper trading is off.** It needs instant order handling.
+- **No second-by-second activity feed.** The status bar shows the update's progress instead.
+- **Read state of alerts** is remembered per browser.
 
-1. Sign in at [render.com](https://render.com) with GitHub and allow access to the `oalgo2` repository.
-2. Choose **New** → **Blueprint**, pick `vyomruppar/oalgo2`. Render reads `render.yaml` and proposes one service, `oalgo2-api`, with a 5 GB disk.
-3. It asks for the values marked "sync: false":
-   - `OALGO_SEC_USER_AGENT`: your name and an email address, for example `Jane Doe jane@example.com`. The SEC asks automated clients to identify themselves and may refuse requests without it.
-   - The `OALGO_SMTP_*` and `OALGO_ALERT_EMAIL_TO` values only if you want alert e-mails; leave them empty otherwise.
-4. Choose **Apply**. The first build takes 5 to 10 minutes because it installs PyTorch for FinBERT.
-5. When the service shows **Live**, copy two things from it:
-   - its URL, for example `https://oalgo2-api.onrender.com`
-   - the value of `OALGO_API_KEY` under **Environment** (Render generated it)
+## Setup (about 15 minutes, then a 20 to 25 minute first run)
 
-Check it: opening `https://<your-service>.onrender.com/api/health` should show `"status":"ok"`, and `/api/overview` should say "missing or invalid backend key". That second response is correct.
+You need a GitHub account (you have one) and a Vercel account.
 
-**Cost.** The blueprint uses the **Standard** plan (2 GB memory, needed for FinBERT) plus a 5 GB disk, roughly $25 a month plus about $1.25 for the disk at Render's published prices; check Render's pricing page before applying. To pay less, switch to **Starter** (512 MB) and run without the AI model:
-- set `OALGO_SENTIMENT_ENGINE` to `lexicon`
-- under **Settings** → **Build**, add the Docker build argument `INSTALL_AI` = `0`
+### 1. Create a Vercel token
 
-Headlines are then scored with the built-in word list, and the dashboard says so. The free Render plan cannot be used: it has no disk and sleeps when idle, which would lose your data and stop the daily scan.
+1. Sign up at [vercel.com](https://vercel.com) with GitHub. Choose the free Hobby plan.
+2. Open **Account Settings** → **Tokens** → **Create**. Name it `oalgo2`, scope your personal account, and choose the longest expiry offered.
+3. Copy the token. You will paste it in step 4.
 
-## 2. Dashboard on Vercel (about 5 minutes)
+You do not create a Vercel project yourself: the first update creates one called `oalgo2`. Do not import the repository into Vercel either, because that would publish a copy without data.
 
-1. Sign in at [vercel.com](https://vercel.com) with GitHub and allow access to `oalgo2`.
-2. **Add New** → **Project** → import `vyomruppar/oalgo2`.
-3. Set **Root Directory** to `frontend`. Vercel detects Next.js and reads `frontend/vercel.json`.
-4. Under **Environment Variables** add four values:
+### 2. Create a GitHub token for the dashboard
 
-   | Name | Value |
-   |---|---|
-   | `BACKEND_URL` | the Render URL from step 1.5, with no trailing slash |
-   | `BACKEND_API_KEY` | the `OALGO_API_KEY` value from Render |
-   | `APP_PASSWORD` | the password you will sign in with; use a long one |
-   | `AUTH_SECRET` | 32 or more random characters; generate them with the command below |
+The dashboard uses this token to queue your changes and start an update.
 
-   ```bash
-   openssl rand -hex 32
-   ```
+1. GitHub → your picture → **Settings** → **Developer settings** → **Personal access tokens** → **Fine-grained tokens** → **Generate new token**.
+2. Name `oalgo2 dashboard`, expiry up to one year (write the date down; see "Every year" below).
+3. **Repository access**: Only select repositories → `oalgo2`.
+4. **Permissions** → Repository permissions: **Actions**: Read and write, **Contents**: Read and write. Leave everything else at No access.
+5. Generate and copy it.
 
-5. Choose **Deploy**. Vercel gives you an address such as `https://oalgo2.vercel.app`.
+### 3. Create your master secret
 
-The production branch is the repository's default branch, currently `claude/admiring-hypatia-8mav3t`. Every push to it redeploys both services automatically.
+```bash
+openssl rand -hex 32
+```
 
-## 3. First run
+This 64-character value encrypts your data and derives the dashboard's other keys. **Keep a copy somewhere safe**, such as a password manager. If it is lost or changed, the saved data cannot be decrypted and the platform starts over from an empty database.
 
-1. Open the Vercel address and sign in with `APP_PASSWORD`.
-2. On **Command**, choose **Run scan now**. The first scan verifies listings, downloads prices and SEC filings and scores about 300 stocks; expect around 10 to 15 minutes. The status bar shows its progress.
-3. Under **My portfolio**, add the stocks you own, or import them as CSV.
-4. After that, a scan runs on its own every weekday at 22:30 UTC.
+No `openssl`? Any password manager can generate a random string of 40 or more characters instead.
 
-The hosted copy starts empty. The sample holdings and data from development are not uploaded.
+### 4. Add five repository secrets
 
-## Changing things later
+In the `oalgo2` repository: **Settings** → **Secrets and variables** → **Actions** → **New repository secret**, five times:
+
+| Name | Value |
+|---|---|
+| `OALGO_SECRET` | the master secret from step 3 |
+| `VERCEL_TOKEN` | the token from step 1 |
+| `DASHBOARD_GH_TOKEN` | the token from step 2 |
+| `APP_PASSWORD` | the password you will sign in with; make it long |
+| `OALGO_SEC_USER_AGENT` | your name and an email, for example `Jane Doe jane@example.com` (the SEC asks automated tools to identify themselves) |
+
+Secrets are never shown in logs, not even to you.
+
+### 5. Run the first update
+
+1. Open the repository's **Actions** tab. If GitHub asks whether to enable workflows, enable them.
+2. Choose **Update** on the left → **Run workflow** → **Run workflow**.
+3. The first run takes 20 to 25 minutes: it installs everything, downloads the FinBERT model, scans and publishes.
+4. When it finishes, its summary shows the dashboard's address. The permanent one is in Vercel under the `oalgo2` project → **Domains**, usually `https://oalgo2.vercel.app` or similar.
+
+### 6. Use it
+
+1. Open the address and sign in with `APP_PASSWORD`.
+2. Add your holdings under **My portfolio** (or import a CSV). They appear after the next update, about 5 minutes later.
+3. From then on it updates by itself every weekday evening, plus whenever you change something.
+
+## Day to day
 
 | To | Do |
 |---|---|
-| Change the password | Edit `APP_PASSWORD` in Vercel and redeploy. Existing sign-ins stay valid until they expire (30 days) unless you also change `AUTH_SECRET`. |
-| Sign everyone out now | Change `AUTH_SECRET` in Vercel and redeploy. |
-| Rotate the backend key | Generate a new `OALGO_API_KEY` in Render, paste the same value into `BACKEND_API_KEY` in Vercel, redeploy both. |
-| Scan more stocks | Settings → Stocks per scan. More stocks take longer and use more disk. |
-| Back up your data | Render → the service → **Disks** → snapshots, or download `/data/oalgo.sqlite` through Render's shell. |
+| Change the password | Edit the `APP_PASSWORD` secret, then run **Update** once. Changing `OALGO_SECRET` is not the way: it would lose your data. |
+| See whether a change was applied | **Scans and data** → "Recent changes from the dashboard" lists each one, with the reason if it was refused. |
+| Force a fresh scan | **Command** → **Run scan now**, or run **Update** from the Actions tab. |
+| Check what failed | The Actions tab shows each run. Logs only say which step failed, on purpose. |
 
-## If something is wrong
+**Every year**: when the GitHub token from step 2 expires, the dashboard can no longer queue changes. Create a new one the same way and replace the `DASHBOARD_GH_TOKEN` secret. The Vercel token may expire too; replace `VERCEL_TOKEN` the same way.
 
-| You see | Cause and fix |
-|---|---|
-| "Cannot reach the research backend" or every panel empty | `BACKEND_URL` is wrong or the Render service is not live. Check the URL and the health check above. |
-| 401 errors after signing in | `BACKEND_API_KEY` in Vercel does not match `OALGO_API_KEY` in Render. |
-| The sign-in page loops or errors | `AUTH_SECRET` is missing or shorter than 32 characters. |
-| Status bar says "Polling every 5s" | Vercel's relay closed the live event stream. Updates still arrive every 5 seconds; nothing is lost. |
-| Render runs out of memory | Use the Standard plan, or switch sentiment to the word list as described under Cost. |
+## Limits of the free services
+
+- **GitHub pauses scheduled runs after 60 days without activity in the repository.** If the daily update stops, open the Actions tab and re-enable it. Changes you make on the dashboard still start updates either way.
+- **Saved data.** The encrypted state is kept in the Actions cache and backed up to a release called `oalgo-state` (marked "do not delete"). The cache drops anything unused for 7 days; the release copy does not expire.
+- **Vercel's Hobby plan is for personal, non-commercial use.**
+- **Update length.** A run is capped at 75 minutes. Scanning far more than 300 stocks may hit it; raise the scan size gradually.
+
+## Removing it
+
+Delete the `oalgo2` project in Vercel, the five repository secrets, the `oalgo-state` release and the `oalgo-queue` branch.
+
+## Optional: instant updates on a paid server
+
+If you later want instant changes, live activity and paper trading online, the repository also contains a paid setup: the research engine on Render with a disk (`render.yaml`, about $25 a month for the 2 GB plan FinBERT needs), with the dashboard on Vercel relaying to it (`BACKEND_URL` and `BACKEND_API_KEY`). The dashboard code supports both; the free setup above is the default.

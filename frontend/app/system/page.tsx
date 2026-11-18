@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import EChart, { C, baseOption, catAxis, valueAxis } from "@/components/EChart";
 import { Card, Empty, ErrorBox, Loading, PageTitle, ScoreBar, SignalChip, Stat, SymbolLink, Tag, useApi } from "@/components/ui";
-import { READ_ONLY, send, SNAPSHOT, type J } from "@/lib/api";
+import { NO_WRITES, QUEUED, READ_ONLY, send, type J } from "@/lib/api";
 import { fmtCompact, fmtDateTime, fmtMoney, fmtNum, regimeLabel, timeAgo, titleCase } from "@/lib/format";
 import { stageLabel, useLive } from "@/lib/live";
 
@@ -21,6 +21,37 @@ const RULE_LABEL: Record<string, string> = {
   price_data_quality: "Price data failed validation",
   fresh_prices: "Stale prices",
 };
+
+function ChangeLog() {
+  const { data } = useApi("/api/ops-log");
+  const entries: J[] = data?.entries ?? [];
+  return (
+    <Card title="Recent changes from the dashboard" className="mt-3" pad={false}>
+      {entries.length === 0 ? (
+        <Empty title="No changes yet">Holdings, settings and scan requests you make here are applied by the next update and listed below.</Empty>
+      ) : (
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-line/40">
+              <th className="th">Requested</th>
+              <th className="th">Change</th>
+              <th className="th">Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.slice(0, 30).map((e) => (
+              <tr key={e.file} className="border-b border-line/30">
+                <td className="td text-dim">{fmtDateTime(e.queued_at ?? e.at)}</td>
+                <td className="td">{e.what ?? "Unreadable change"}</td>
+                <td className={`td whitespace-normal ${e.status === "applied" ? "text-up" : "text-down"}`}>{e.status === "applied" ? "Applied" : `Not applied: ${e.reason}`}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </Card>
+  );
+}
 
 export default function Overview() {
   const { data, error, mutate } = useApi("/api/overview", 30000);
@@ -71,10 +102,10 @@ export default function Overview() {
         sub="What the research engine is doing now, what it found on the last scan, and how healthy its data sources are. Every figure on this page comes from the backend; nothing is illustrative."
         right={
           <div className="flex items-center gap-2">
-            <button className="btn" disabled={busy || running || SNAPSHOT} onClick={() => run(false)} title={SNAPSHOT ? READ_ONLY : "Re-screen and re-score from stored data without downloading"}>
+            <button className="btn" disabled={busy || running || NO_WRITES} onClick={() => run(false)} title={NO_WRITES ? READ_ONLY : "Re-screen and re-score from stored data without downloading"}>
               Re-score stored data
             </button>
-            <button className="btn btn-primary" disabled={busy || running || SNAPSHOT} title={SNAPSHOT ? READ_ONLY : undefined} onClick={() => run(true)}>
+            <button className="btn btn-primary" disabled={busy || running || NO_WRITES} title={NO_WRITES ? READ_ONLY : undefined} onClick={() => run(true)}>
               {running ? "Scan running" : "Run scan now"}
             </button>
           </div>
@@ -283,6 +314,7 @@ export default function Overview() {
           </table>
         </Card>
       </div>
+      {QUEUED && <ChangeLog />}
     </>
   );
 }

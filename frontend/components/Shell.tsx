@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SWRConfig } from "swr";
-import { fetcher, SNAPSHOT } from "@/lib/api";
+import useSWR from "swr";
+import { useEffect, useRef, useState } from "react";
+import { fetcher, QUEUED, SNAPSHOT } from "@/lib/api";
 import { regimeLabel, timeAgo } from "@/lib/format";
 import { LiveProvider, stageLabel, useLive } from "@/lib/live";
 import Backdrop from "./Backdrop";
@@ -52,13 +54,42 @@ function isOn(path: string, href: string) {
   return href === "/" ? path === "/" : path === href || path.startsWith(`${href}/`);
 }
 
+/** Free hosted setup: show whether a GitHub Actions update is running or waiting, and offer a reload when new data is published. */
+function UpdateStatus() {
+  const { data: st } = useSWR("/ops/status", (u: string) => fetch(u, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)), { refreshInterval: 20000 });
+  const { data: meta } = useSWR("/data/meta.json", (u: string) => fetch(u, { cache: "no-store" }).then((r) => r.json()), { refreshInterval: 30000 });
+  const first = useRef<string | null>(null);
+  const [fresh, setFresh] = useState(false);
+  useEffect(() => {
+    if (!meta?.exported_at) return;
+    if (first.current == null) first.current = meta.exported_at;
+    else if (meta.exported_at !== first.current) setFresh(true);
+  }, [meta]);
+  return (
+    <>
+      {st?.running ? (
+        <span className="text-accent" title="GitHub Actions is updating the data. The page offers a reload when it is done.">
+          Update running, started {timeAgo(st.started_at)}
+        </span>
+      ) : st?.queued_changes ? (
+        <span className="text-warn">{st.queued_changes} change{st.queued_changes > 1 ? "s" : ""} waiting for the next update</span>
+      ) : null}
+      {fresh && (
+        <button type="button" className="chip border-up/50 text-up hover:bg-up/10" onClick={() => window.location.reload()}>
+          New data is ready. Reload
+        </button>
+      )}
+    </>
+  );
+}
+
 function StatusBar() {
   const { mode, scan } = useLive();
   const { data } = useApi("/api/overview", 60000);
   const regime = regimeLabel(data?.regime?.regime);
   const last = data?.scan?.last_success;
   const modeCls = mode === "snapshot" ? "bg-warn" : mode === "stream" ? "bg-up shadow-[0_0_8px_rgb(61_242_196)]" : mode === "polling" ? "bg-warn" : mode === "offline" ? "bg-down" : "bg-faint";
-  const modeText = { stream: "Live updates", polling: "Polling every 5s", offline: "Backend unreachable", connecting: "Connecting", snapshot: `Read-only snapshot of ${last?.stats?.price_as_of ?? "the last scan"}` }[mode];
+  const modeText = { stream: "Live updates", polling: "Polling every 5s", offline: "Backend unreachable", connecting: "Connecting", snapshot: QUEUED ? `Prices as of ${last?.stats?.price_as_of ?? "the last scan"}` : `Read-only snapshot of ${last?.stats?.price_as_of ?? "the last scan"}` }[mode];
   return (
     <div className="sticky top-0 z-20 border-b border-line/40 bg-bg/70 backdrop-blur-xl">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1 px-5 py-2 text-[12px]">
@@ -66,7 +97,8 @@ function StatusBar() {
           <span className={`h-1.5 w-1.5 rounded-full ${modeCls}`} />
           {modeText}
         </span>
-        {SNAPSHOT && <span className="text-faint">Sample holdings. Scans, saving and live prices need the app running on your computer.</span>}
+        {SNAPSHOT && !QUEUED && <span className="text-faint">Sample holdings. Scans, saving and live prices need the app running on your computer.</span>}
+        {QUEUED && <UpdateStatus />}
         <span className={SNAPSHOT ? "hidden" : "text-dim"}>
           Scan <span className={scan.running ? "text-accent" : "text-ink"}>{scan.running ? `${stageLabel(scan.stage)} ${Math.round(scan.progress * 100)}%` : "idle"}</span>
         </span>

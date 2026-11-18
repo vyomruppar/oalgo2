@@ -33,7 +33,7 @@ function PaperTicket({ symbol, price, eligible }: { symbol: string; price: numbe
       setBusy(false);
     }
   };
-  if (SNAPSHOT) return <Empty title="Not available in the snapshot">Paper trading needs the app running on your computer.</Empty>;
+  if (SNAPSHOT) return <Empty title="Paper trading is off here">Paper trading needs the app running on your computer.</Empty>;
   if (!eligible || !price) return <Empty title="Paper trading unavailable">Only verified, scanned NYSE and NASDAQ listings can be paper traded.</Empty>;
   return (
     <div className="space-y-3 text-[12.5px]">
@@ -105,7 +105,7 @@ export default function StockPage() {
   if (info.error) {
     const nf = info.error instanceof ApiError && info.error.status === 404;
     return nf ? (
-      <Card><Empty title={SNAPSHOT ? `${symbol} is not included in this snapshot` : `${symbol} is not in the verified NYSE/NASDAQ directory`}>{SNAPSHOT ? "The snapshot holds the stocks from the last scan only. " : ""}This platform only researches securities whose listing on the NYSE or NASDAQ can be verified. OTC and other venues are excluded. <Link className="underline" href="/stocks">Back to the explorer</Link></Empty></Card>
+      <Card><Empty title={SNAPSHOT ? `${symbol} was not part of the last scan` : `${symbol} is not in the verified NYSE/NASDAQ directory`}>{SNAPSHOT ? "Pages exist for the stocks in the last scan and the ones you own. Add it as a holding, or raise the scan size in Settings, and it appears after the next update. " : ""}This platform only researches securities whose listing on the NYSE or NASDAQ can be verified. OTC and other venues are excluded. <Link className="underline" href="/stocks">Back to the explorer</Link></Empty></Card>
     ) : <ErrorBox error={info.error} />;
   }
   if (!info.data) return <Loading rows={8} />;

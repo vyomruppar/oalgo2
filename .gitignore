@@ -17,3 +17,10 @@ playwright-report/
 frontend/snapshot/dist/
 frontend/tsconfig.tsbuildinfo
 *.tsbuildinfo
+frontend/public/data/
+state/
+state.tar.enc
+queue-branch/
+ci.log
+build.log
+frontend/.vercel/

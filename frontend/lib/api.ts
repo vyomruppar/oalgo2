@@ -9,7 +9,12 @@ export type J = any;
 
 /** True in the static, read-only build (no backend): data comes from exported JSON files. */
 export const SNAPSHOT = process.env.NEXT_PUBLIC_SNAPSHOT === "1";
+/** Free hosted setup: data comes from files published by GitHub Actions; changes are queued for the next run. */
+export const QUEUED = SNAPSHOT && process.env.NEXT_PUBLIC_QUEUE === "1";
+/** No way to save anything: a plain read-only copy. */
+export const NO_WRITES = SNAPSHOT && !QUEUED;
 export const READ_ONLY = "This is a read-only snapshot. Run the app on your computer to do this.";
+export const NOT_IN_FREE = "Paper trading is not available in the free hosted version. Run the app on your computer to use it.";
 
 export class ApiError extends Error {
   status: number;
@@ -39,6 +44,10 @@ export const fetcher = (path: string): Promise<J> =>
     : fetch(`${API_URL}${path}`, { cache: "no-store" }).then(parse);
 
 export function send(method: "POST" | "PUT" | "DELETE", path: string, body?: unknown): Promise<J> {
+  if (QUEUED) {
+    // queued for the next GitHub Actions run; the server encrypts it and starts the run
+    return fetch("/ops", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ method, path, body }) }).then(parse);
+  }
   if (SNAPSHOT) return Promise.reject(new ApiError(405, READ_ONLY));
   return fetch(`${API_URL}${path}`, {
     method,
