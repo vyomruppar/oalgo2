@@ -6,7 +6,7 @@ import NewsFeed from "@/components/NewsFeed";
 import { HoldingTile, PortfolioTracker } from "@/components/Portfolio";
 import StarMap from "@/components/StarMap";
 import { Card, CountUp, Empty, ErrorBox, Loading, SignalChip, SymbolLink, Tag, useApi } from "@/components/ui";
-import { send, type J } from "@/lib/api";
+import { READ_ONLY, send, SNAPSHOT, type J } from "@/lib/api";
 import { fmtMoney, fmtPct, regimeLabel, signClass, timeAgo, titleCase } from "@/lib/format";
 import { stageLabel, useLive } from "@/lib/live";
 
@@ -117,7 +117,7 @@ export default function Command() {
               <dd className="text-right">{data.engine.is_ai ? "FinBERT (local AI)" : "Word list"}</dd>
             </dl>
             <div className="mt-3 flex items-center gap-2">
-              <button className="btn btn-primary" disabled={busy || running} onClick={runScan}>
+              <button className="btn btn-primary" disabled={busy || running || SNAPSHOT} title={SNAPSHOT ? READ_ONLY : undefined} onClick={runScan}>
                 {running ? "Scan running" : "Run scan now"}
               </button>
               <Link href="/system" className="btn">

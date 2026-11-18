@@ -3,18 +3,19 @@
 import { useMemo, useState } from "react";
 import EChart, { C, baseOption, catAxis, timeAxis, valueAxis, zoom } from "@/components/EChart";
 import { Banner, Card, Empty, ErrorBox, KV, Loading, PageTitle, Stat, SymbolLink, Tabs, Tag, useApi } from "@/components/ui";
-import { send, type J } from "@/lib/api";
+import { READ_ONLY, send, SNAPSHOT, type J } from "@/lib/api";
 import { fmtDateTime, fmtMoney, fmtNum, fmtPct, signClass } from "@/lib/format";
 
 export default function Portfolio() {
   const pf = useApi("/api/portfolio", 60000);
   const risk = useApi("/api/portfolio/risk", 60000);
   const [busy, setBusy] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
   const d = pf.data;
   const r = risk.data;
 
   const reset = async () => {
-    if (!window.confirm("Reset the paper portfolio? All hypothetical positions, trades and the equity history are deleted.")) return;
+    setConfirmReset(false);
     setBusy(true);
     try {
       await send("POST", "/api/portfolio/reset?initial_cash=100000");
@@ -109,7 +110,15 @@ export default function Portfolio() {
       <PageTitle
         title="Paper trading"
         sub={`Hypothetical positions only. Fill model: ${d.fill_model}. Place paper orders from any stock's research page.`}
-        right={<div className="flex items-center gap-2"><Tag tone="warn">Paper-traded · no real orders</Tag><button className="btn" disabled={busy} onClick={reset}>Reset paper portfolio</button></div>}
+        right={<div className="flex items-center gap-2"><Tag tone="warn">Paper-traded · no real orders</Tag>{confirmReset ? (
+            <>
+              <span className="text-[12px] text-dim">Delete all paper positions, trades and history?</span>
+              <button className="btn border-down/60 text-down" disabled={busy} onClick={reset}>Yes, reset</button>
+              <button className="btn" onClick={() => setConfirmReset(false)}>Keep it</button>
+            </>
+          ) : (
+            <button className="btn" disabled={busy || SNAPSHOT} title={SNAPSHOT ? READ_ONLY : undefined} onClick={() => setConfirmReset(true)}>Reset paper portfolio</button>
+          )}</div>}
       />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <Stat label="Paper equity" value={fmtMoney(d.equity, 0)} sub={`started at ${fmtMoney(d.initial_cash, 0)}`} />

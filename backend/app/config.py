@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     sec_user_agent: str = "oalgo2-research/0.1"
     http_user_agent: str = "oalgo2-research/0.1"
     cors_origins: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    # Shared secret for hosted deployments. When set, every /api route except /api/health requires
+    # the header X-Backend-Key with this value (the dashboard server adds it). Unset = open, for local use.
+    api_key: str | None = None
 
     # Scan sizing (free providers are rate limited; the universe fills in incrementally)
     scan_max_symbols: int = 300

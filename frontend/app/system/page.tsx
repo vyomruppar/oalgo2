@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import EChart, { C, baseOption, catAxis, valueAxis } from "@/components/EChart";
 import { Card, Empty, ErrorBox, Loading, PageTitle, ScoreBar, SignalChip, Stat, SymbolLink, Tag, useApi } from "@/components/ui";
-import { send, type J } from "@/lib/api";
+import { READ_ONLY, send, SNAPSHOT, type J } from "@/lib/api";
 import { fmtCompact, fmtDateTime, fmtMoney, fmtNum, regimeLabel, timeAgo, titleCase } from "@/lib/format";
 import { stageLabel, useLive } from "@/lib/live";
 
@@ -71,10 +71,10 @@ export default function Overview() {
         sub="What the research engine is doing now, what it found on the last scan, and how healthy its data sources are. Every figure on this page comes from the backend; nothing is illustrative."
         right={
           <div className="flex items-center gap-2">
-            <button className="btn" disabled={busy || running} onClick={() => run(false)} title="Re-screen and re-score from stored data without downloading">
+            <button className="btn" disabled={busy || running || SNAPSHOT} onClick={() => run(false)} title={SNAPSHOT ? READ_ONLY : "Re-screen and re-score from stored data without downloading"}>
               Re-score stored data
             </button>
-            <button className="btn btn-primary" disabled={busy || running} onClick={() => run(true)}>
+            <button className="btn btn-primary" disabled={busy || running || SNAPSHOT} title={SNAPSHOT ? READ_ONLY : undefined} onClick={() => run(true)}>
               {running ? "Scan running" : "Run scan now"}
             </button>
           </div>

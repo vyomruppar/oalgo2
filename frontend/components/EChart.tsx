@@ -31,7 +31,7 @@ export function baseOption(extra: echarts.EChartsOption = {}): echarts.EChartsOp
     animationDuration: 900,
     animationEasing: "cubicOut",
     animationDurationUpdate: 500,
-    textStyle: { fontFamily: "Hanken Grotesk Variable, ui-sans-serif, system-ui", color: C.dim },
+    textStyle: { fontFamily: "Hanken Grotesk Variable, Hanken Grotesk, ui-sans-serif, system-ui", color: C.dim },
     grid: { left: 52, right: 16, top: 28, bottom: 28 },
     tooltip: {
       trigger: "axis",

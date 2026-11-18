@@ -13,3 +13,7 @@ backend/data/
 *.log
 test-results/
 playwright-report/
+
+frontend/snapshot/dist/
+frontend/tsconfig.tsbuildinfo
+*.tsbuildinfo

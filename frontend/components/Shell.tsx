@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { SWRConfig } from "swr";
-import { fetcher } from "@/lib/api";
+import { fetcher, SNAPSHOT } from "@/lib/api";
 import { regimeLabel, timeAgo } from "@/lib/format";
 import { LiveProvider, stageLabel, useLive } from "@/lib/live";
 import Backdrop from "./Backdrop";
@@ -57,8 +57,8 @@ function StatusBar() {
   const { data } = useApi("/api/overview", 60000);
   const regime = regimeLabel(data?.regime?.regime);
   const last = data?.scan?.last_success;
-  const modeCls = mode === "stream" ? "bg-up shadow-[0_0_8px_rgb(61_242_196)]" : mode === "polling" ? "bg-warn" : mode === "offline" ? "bg-down" : "bg-faint";
-  const modeText = { stream: "Live updates", polling: "Polling every 5s", offline: "Backend unreachable", connecting: "Connecting" }[mode];
+  const modeCls = mode === "snapshot" ? "bg-warn" : mode === "stream" ? "bg-up shadow-[0_0_8px_rgb(61_242_196)]" : mode === "polling" ? "bg-warn" : mode === "offline" ? "bg-down" : "bg-faint";
+  const modeText = { stream: "Live updates", polling: "Polling every 5s", offline: "Backend unreachable", connecting: "Connecting", snapshot: `Read-only snapshot of ${last?.stats?.price_as_of ?? "the last scan"}` }[mode];
   return (
     <div className="sticky top-0 z-20 border-b border-line/40 bg-bg/70 backdrop-blur-xl">
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1 px-5 py-2 text-[12px]">
@@ -66,10 +66,11 @@ function StatusBar() {
           <span className={`h-1.5 w-1.5 rounded-full ${modeCls}`} />
           {modeText}
         </span>
-        <span className="text-dim">
+        {SNAPSHOT && <span className="text-faint">Sample holdings. Scans, saving and live prices need the app running on your computer.</span>}
+        <span className={SNAPSHOT ? "hidden" : "text-dim"}>
           Scan <span className={scan.running ? "text-accent" : "text-ink"}>{scan.running ? `${stageLabel(scan.stage)} ${Math.round(scan.progress * 100)}%` : "idle"}</span>
         </span>
-        <span className="text-dim">
+        <span className={SNAPSHOT ? "hidden" : "text-dim"}>
           Last scan <span className="text-ink">{timeAgo(last?.finished_at)}</span>
         </span>
         <span className="text-dim">
@@ -93,8 +94,17 @@ function StatusBar() {
   );
 }
 
-export default function Shell({ children }: { children: React.ReactNode }) {
+export default function Shell({ children, signOut = false }: { children: React.ReactNode; signOut?: boolean }) {
   const path = usePathname();
+  if (path === "/login") {
+    // the sign-in page has no navigation and makes no API calls
+    return (
+      <>
+        <Backdrop />
+        <main className="mx-auto max-w-[1560px] px-4 py-5 sm:px-5">{children}</main>
+      </>
+    );
+  }
   return (
     <SWRConfig value={{ fetcher }}>
       <LiveProvider>
@@ -123,7 +133,16 @@ export default function Shell({ children }: { children: React.ReactNode }) {
                 </div>
               ))}
             </nav>
-            <div className="border-t border-line/40 px-5 py-3 text-[11px] leading-relaxed text-faint">Research and tracking only. Not investment advice. This platform cannot place orders.</div>
+            <div className="border-t border-line/40 px-5 py-3 text-[11px] leading-relaxed text-faint">
+              Research and tracking only. Not investment advice. This platform cannot place orders.
+              {signOut && (
+                <form method="post" action="/auth/logout" className="mt-2">
+                  <button type="submit" className="text-[12px] text-dim underline-offset-2 hover:text-ink hover:underline">
+                    Sign out
+                  </button>
+                </form>
+              )}
+            </div>
           </aside>
           <div className="min-w-0 flex-1">
             <StatusBar />

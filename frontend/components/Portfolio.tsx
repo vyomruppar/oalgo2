@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import EChart, { C, baseOption, timeAxis, valueAxis, zoom } from "./EChart";
 import { Card, Empty, Loading, ScoreBar, Seg, SentimentBadge, SignalChip, Sparkline, useApi } from "./ui";
-import { send, type J } from "@/lib/api";
+import { READ_ONLY, send, SNAPSHOT, type J } from "@/lib/api";
 import { fmtMoney, fmtNum, fmtPct, signClass } from "@/lib/format";
 
 const RANGES = ["1m", "3m", "6m", "1y", "2y", "all"] as const;
@@ -108,6 +108,7 @@ export function HoldingsEditor({ lots, onChange }: { lots: J[]; onChange: () => 
   const [showCsv, setShowCsv] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [removing, setRemoving] = useState<number | null>(null);
 
   const run = async (fn: () => Promise<unknown>, okText: string) => {
     setBusy(true);
@@ -167,7 +168,7 @@ export function HoldingsEditor({ lots, onChange }: { lots: J[]; onChange: () => 
           <input className="input mt-1 w-full" maxLength={300} value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
         </label>
         <div className="col-span-2 flex items-end gap-2 md:col-span-1">
-          <button className="btn btn-primary" disabled={busy} type="submit">{editing != null ? "Save changes" : "Add holding"}</button>
+          <button className="btn btn-primary" disabled={busy || SNAPSHOT} title={SNAPSHOT ? READ_ONLY : undefined} type="submit">{editing != null ? "Save changes" : "Add holding"}</button>
           {editing != null && <button className="btn" type="button" onClick={() => { setEditing(null); setForm({ symbol: "", shares: "", cost: "", purchase_date: today(), note: "" }); }}>Cancel</button>}
         </div>
       </form>
@@ -178,7 +179,7 @@ export function HoldingsEditor({ lots, onChange }: { lots: J[]; onChange: () => 
             One lot per line: <span className="num text-ink">ticker,shares,price paid,YYYY-MM-DD,note</span>. Nothing is saved if any line has a problem.
             <textarea className="input num mt-1 h-24 w-full" value={csv} onChange={(e) => setCsv(e.target.value)} placeholder={"AAPL,10,150.25,2024-03-14\nMSFT,4,410,2025-01-09,retirement account"} />
           </label>
-          <button className="btn mt-2" disabled={busy || !csv.trim()} type="button" onClick={async () => { if (await run(() => send("POST", "/api/holdings/import", { csv }), "Holdings imported.")) setCsv(""); }}>Import holdings</button>
+          <button className="btn mt-2" disabled={busy || !csv.trim() || SNAPSHOT} title={SNAPSHOT ? READ_ONLY : undefined} type="button" onClick={async () => { if (await run(() => send("POST", "/api/holdings/import", { csv }), "Holdings imported.")) setCsv(""); }}>Import holdings</button>
         </div>
       )}
       {lots.length > 0 && (
@@ -195,8 +196,17 @@ export function HoldingsEditor({ lots, onChange }: { lots: J[]; onChange: () => 
                   <td className="td num text-dim">{l.purchase_date}</td>
                   <td className="td max-w-[220px] truncate text-faint">{l.note}</td>
                   <td className="td text-right">
-                    <button className="mr-3 text-[12px] text-dim hover:text-accent" type="button" onClick={() => edit(l)}>Edit</button>
-                    <button className="text-[12px] text-dim hover:text-down" type="button" onClick={() => { if (window.confirm(`Remove this ${l.symbol} lot from your holdings?`)) run(() => send("DELETE", `/api/holdings/${l.id}`), "Holding removed."); }}>Remove</button>
+                    {SNAPSHOT ? null : removing === l.id ? (
+                      <>
+                        <button className="mr-3 text-[12px] font-semibold text-down" type="button" onClick={() => { setRemoving(null); run(() => send("DELETE", `/api/holdings/${l.id}`), "Holding removed."); }}>Confirm remove</button>
+                        <button className="text-[12px] text-dim hover:text-ink" type="button" onClick={() => setRemoving(null)}>Keep</button>
+                      </>
+                    ) : (
+                      <>
+                        <button className="mr-3 text-[12px] text-dim hover:text-accent" type="button" onClick={() => edit(l)}>Edit</button>
+                        <button className="text-[12px] text-dim hover:text-down" type="button" onClick={() => setRemoving(l.id)}>Remove</button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -204,6 +214,7 @@ export function HoldingsEditor({ lots, onChange }: { lots: J[]; onChange: () => 
           </table>
         </div>
       )}
+      {SNAPSHOT && <p className="mt-2 text-[12px] text-warn">These are sample holdings in a read-only snapshot. To track your own, run the app on your computer.</p>}
       <p className="note mt-2">This is a record of what you already own. Adding or removing a holding here never buys or sells anything.</p>
     </Card>
   );

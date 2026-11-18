@@ -7,15 +7,16 @@ import CandleChart, { OVERLAYS } from "@/components/CandleChart";
 import EChart, { C, baseOption, catAxis, timeAxis, valueAxis, zoom } from "@/components/EChart";
 import { Banner, Card, Empty, ErrorBox, KV, Loading, Seg, SignalChip, Tag, useApi } from "@/components/ui";
 import NewsFeed from "@/components/NewsFeed";
-import { ApiError, send, type J } from "@/lib/api";
+import { ApiError, send, SNAPSHOT, type J } from "@/lib/api";
 import { fmtCompact, fmtDateTime, fmtMoney, fmtNum, fmtPct, scoreColor, signClass, titleCase } from "@/lib/format";
 
-const RANGES = ["3m", "6m", "1y", "2y", "5y", "max"] as const;
+// the snapshot stores two years of prices per stock
+const RANGES = (SNAPSHOT ? ["3m", "6m", "1y", "2y"] : ["3m", "6m", "1y", "2y", "5y", "max"]) as readonly ("3m" | "6m" | "1y" | "2y" | "5y" | "max")[];
 const SUB = ["rsi_14", "macd", "mfi_14", "obv", "atr_14", "rel_strength", "rvol_21"] as const;
 const SUB_LABEL: Record<string, string> = { rsi_14: "RSI 14", macd: "MACD", mfi_14: "Money Flow 14", obv: "On-balance volume", atr_14: "ATR 14", rel_strength: "Rel. strength vs SPY", rvol_21: "Realised vol 21d" };
 
 function PaperTicket({ symbol, price, eligible }: { symbol: string; price: number | null; eligible: boolean }) {
-  const size = useApi(price ? `/api/portfolio/size/${symbol}` : null);
+  const size = useApi(price && !SNAPSHOT ? `/api/portfolio/size/${symbol}` : null);
   const [qty, setQty] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -32,6 +33,7 @@ function PaperTicket({ symbol, price, eligible }: { symbol: string; price: numbe
       setBusy(false);
     }
   };
+  if (SNAPSHOT) return <Empty title="Not available in the snapshot">Paper trading needs the app running on your computer.</Empty>;
   if (!eligible || !price) return <Empty title="Paper trading unavailable">Only verified, scanned NYSE and NASDAQ listings can be paper traded.</Empty>;
   return (
     <div className="space-y-3 text-[12.5px]">
@@ -103,7 +105,7 @@ export default function StockPage() {
   if (info.error) {
     const nf = info.error instanceof ApiError && info.error.status === 404;
     return nf ? (
-      <Card><Empty title={`${symbol} is not in the verified NYSE/NASDAQ directory`}>This platform only researches securities whose listing on the NYSE or NASDAQ can be verified. OTC and other venues are excluded. <Link className="underline" href="/stocks">Back to the explorer</Link></Empty></Card>
+      <Card><Empty title={SNAPSHOT ? `${symbol} is not included in this snapshot` : `${symbol} is not in the verified NYSE/NASDAQ directory`}>{SNAPSHOT ? "The snapshot holds the stocks from the last scan only. " : ""}This platform only researches securities whose listing on the NYSE or NASDAQ can be verified. OTC and other venues are excluded. <Link className="underline" href="/stocks">Back to the explorer</Link></Empty></Card>
     ) : <ErrorBox error={info.error} />;
   }
   if (!info.data) return <Loading rows={8} />;

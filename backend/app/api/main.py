@@ -5,6 +5,7 @@ real order."""
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 import logging
 import re
@@ -15,7 +16,7 @@ import numpy as np
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 
@@ -64,6 +65,18 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="oalgo2 quantitative research platform", version="0.1.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=get_settings().cors_origins, allow_methods=["*"], allow_headers=["*"])
+
+
+@app.middleware("http")
+async def require_backend_key(request, call_next):
+    """In a hosted deployment only the dashboard server, which holds the key, may call the API."""
+    key = get_settings().api_key
+    path = request.url.path
+    if key and path.startswith("/api") and path != "/api/health" and request.method != "OPTIONS":
+        given = request.headers.get("x-backend-key", "")
+        if not hmac.compare_digest(given.encode(), key.encode()):
+            return JSONResponse({"detail": "missing or invalid backend key"}, status_code=401)
+    return await call_next(request)
 
 
 def _sym(symbol: str) -> str:

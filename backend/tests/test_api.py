@@ -93,3 +93,20 @@ def test_there_is_no_live_trading_surface(client):
     assert not installed & {"alpaca-trade-api", "alpaca-py", "ib-insync", "ibapi", "robin-stocks", "ccxt", "tda-api", "schwab-py"}
     assert client.get("/api/strategies").json()["available"] is False      # nothing fabricated before a backtest exists
     assert client.get("/api/ml").json()["status"] == "not_trained"
+
+
+def test_backend_key_is_enforced_when_configured(tmp_env, monkeypatch):
+    from app import config
+    from app.api.main import app
+    monkeypatch.setenv("OALGO_API_KEY", "s3cret-key")
+    config.get_settings.cache_clear()
+    with TestClient(app) as c:
+        assert c.get("/api/health").status_code == 200                       # health check stays open for the host
+        assert c.get("/api/overview").status_code == 401
+        assert c.get("/api/overview", headers={"X-Backend-Key": "wrong"}).status_code == 401
+        assert c.get("/api/overview", headers={"X-Backend-Key": "s3cret-key"}).status_code == 200
+        assert c.post("/api/scans", json={}, headers={"X-Backend-Key": ""}).status_code == 401
+    monkeypatch.delenv("OALGO_API_KEY")
+    config.get_settings.cache_clear()
+    with TestClient(app) as c:
+        assert c.get("/api/overview").status_code == 200                     # unset = open for local use

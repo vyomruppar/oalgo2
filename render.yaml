@@ -1,0 +1,40 @@
+# Render Blueprint for the research engine (API, scheduler, database).
+# Dashboard: deploy frontend/ to Vercel. Step-by-step guide: docs/deploy.md
+services:
+  - type: web
+    name: oalgo2-api
+    runtime: docker
+    repo: https://github.com/vyomruppar/oalgo2
+    branch: claude/admiring-hypatia-8mav3t
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # standard = 2 GB RAM, needed for the FinBERT sentiment model. To save money use "starter",
+    # set OALGO_SENTIMENT_ENGINE=lexicon and the INSTALL_AI build arg to 0 (see docs/deploy.md).
+    plan: standard
+    region: virginia
+    healthCheckPath: /api/health
+    autoDeploy: true
+    disk:
+      name: data
+      mountPath: /data
+      sizeGB: 5
+    envVars:
+      - key: OALGO_DATA_DIR
+        value: /data
+      - key: OALGO_API_KEY
+        generateValue: true
+      - key: OALGO_SEC_USER_AGENT
+        sync: false
+      - key: OALGO_SENTIMENT_ENGINE
+        value: auto
+      - key: OALGO_SCAN_MAX_SYMBOLS
+        value: "300"
+      - key: OALGO_SMTP_HOST
+        sync: false
+      - key: OALGO_SMTP_USER
+        sync: false
+      - key: OALGO_SMTP_PASSWORD
+        sync: false
+      - key: OALGO_ALERT_EMAIL_TO
+        sync: false

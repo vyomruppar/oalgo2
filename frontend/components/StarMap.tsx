@@ -143,12 +143,12 @@ export default function StarMap({ stars: input, height = 520 }: { stars: StarInp
           ctx.beginPath();
           ctx.arc(sx + rr * Math.cos(oa), sy + rr * Math.sin(oa), 1.4 / k, 0, Math.PI * 2);
           ctx.fill();
-          ctx.font = `600 ${11 / k}px "Hanken Grotesk Variable", sans-serif`;
+          ctx.font = `600 ${11 / k}px "Hanken Grotesk Variable", "Hanken Grotesk", sans-serif`;
           ctx.globalAlpha = ease;
           const at = place(sx, sy, rr + 4 / k, s.symbol, 11 / k);
           if (at) ctx.fillText(s.symbol, at[0], at[1]);
         } else if (hovered || (on && (f.query || f.filter !== "all" || k > 1.9) && (s.alpha > 0.5 || f.filter !== "all"))) {
-          ctx.font = `500 ${10.5 / k}px "Hanken Grotesk Variable", sans-serif`;
+          ctx.font = `500 ${10.5 / k}px "Hanken Grotesk Variable", "Hanken Grotesk", sans-serif`;
           ctx.globalAlpha = hovered ? 1 : 0.75 * ease;
           ctx.fillStyle = "#e8ebff";
           const at = place(sx, sy, r + 4 / k, s.symbol, 10.5 / k);
@@ -161,7 +161,7 @@ export default function StarMap({ stars: input, height = 520 }: { stars: StarInp
         const dim = f.sector && f.sector !== arm.sector;
         ctx.globalAlpha = (dim ? 0.25 : 0.7) * ease;
         ctx.fillStyle = f.sector === arm.sector ? "#e8ebff" : "#a0a8d6";
-        ctx.font = `500 ${10.5 / k}px "Hanken Grotesk Variable", sans-serif`;
+        ctx.font = `500 ${10.5 / k}px "Hanken Grotesk Variable", "Hanken Grotesk", sans-serif`;
         ctx.fillText(arm.sector, Math.max(60, Math.min(width - 60, arm.lx)), Math.max(14, Math.min(height - 8, arm.ly)));
       }
       ctx.textAlign = "start";

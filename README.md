@@ -30,6 +30,10 @@ Open http://localhost:3000 and press **Run scan now**. The dashboard server forw
 
 Optional settings go in `backend/.env` (see `.env.example`). Setting `OALGO_SEC_USER_AGENT` to your own contact string is recommended, as the SEC asks automated clients to identify themselves.
 
+## Hosting on the web
+
+The dashboard runs on Vercel and the research engine on Render, behind a password. Follow [`docs/deploy.md`](docs/deploy.md): two import screens, four settings, about 15 minutes plus the first build.
+
 ## What it does
 
 | Area | What you get |

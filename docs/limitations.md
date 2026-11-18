@@ -60,7 +60,9 @@ A research and paper-trading workstation. It ranks and explains; it does not pre
 
 ## Operations
 
-- Single local user, no authentication. Anyone who can reach port 3000 can see your holdings and change settings, so do not expose it to a network you do not control or to the public internet without adding a login in front of it.
+- Run locally, there is no login: anyone who can reach port 3000 can see your holdings and change settings, so keep it on networks you control.
+- Hosted (Vercel + Render), there is one shared password and no per-user accounts. Everyone who knows it sees the same holdings and settings. Sessions last 30 days.
+- The research engine's address is public, but it refuses everything except its health check without the shared key that only the dashboard server holds.
 - Desktop notifications require the dashboard to be open in a browser tab; e-mail needs SMTP settings.
 - The scheduler runs inside the backend process; scans happen only while it is running.
 

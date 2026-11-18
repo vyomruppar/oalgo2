@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Banner, Card, ErrorBox, Loading, PageTitle, Tag, useApi } from "@/components/ui";
-import { send, type J } from "@/lib/api";
+import { READ_ONLY, send, SNAPSHOT, type J } from "@/lib/api";
 import { fmtNum, timeAgo, titleCase } from "@/lib/format";
 
 const SCREEN_FIELDS: { key: string; label: string; step: number; scale?: number; unit?: string }[] = [
@@ -63,7 +63,7 @@ export default function Settings() {
       <PageTitle
         title="Settings"
         sub="Screening thresholds, score weights and signal thresholds. Saving re-screens and re-scores every scanned stock from stored data, without downloading anything."
-        right={<div className="flex items-center gap-2"><button className="btn" disabled={!dirty || busy} onClick={revert}>Discard changes</button><button className="btn btn-primary" disabled={!dirty || busy || total <= 0} onClick={save}>Save and re-score</button></div>}
+        right={<div className="flex items-center gap-2"><button className="btn" disabled={!dirty || busy} onClick={revert}>Discard changes</button><button className="btn btn-primary" disabled={!dirty || busy || total <= 0 || SNAPSHOT} title={SNAPSHOT ? READ_ONLY : undefined} onClick={save}>Save and re-score</button></div>}
       />
       {msg && <div className={`mb-3 rounded border px-3 py-2 text-xs ${msg.ok ? "border-up/40 bg-up/5 text-up" : "border-down/40 bg-down/5 text-down"}`}>{msg.text}</div>}
 

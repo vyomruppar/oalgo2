@@ -2,10 +2,10 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useSWRConfig } from "swr";
-import { API_URL, type J } from "./api";
+import { API_URL, SNAPSHOT, type J } from "./api";
 
 export type LiveEvent = { id: number; type: string; ts: number; data: J };
-type Mode = "connecting" | "stream" | "polling" | "offline";
+type Mode = "connecting" | "stream" | "polling" | "offline" | "snapshot";
 type ScanState = { running: boolean; stage: string | null; progress: number; stats: J };
 
 type Live = { mode: Mode; scan: ScanState; events: LiveEvent[]; notifications: NotificationPermission | "unsupported"; enableNotifications: () => void };
@@ -84,6 +84,10 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
   );
 
   useEffect(() => {
+    if (SNAPSHOT) {
+      setMode("snapshot"); // no backend: nothing to stream or poll
+      return;
+    }
     if (typeof Notification !== "undefined") setNotifications(Notification.permission);
     // seed scan state so a page opened mid-scan shows progress immediately
     fetch(`${API_URL}/api/overview`)
