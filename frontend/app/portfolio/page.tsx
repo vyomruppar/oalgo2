@@ -6,15 +6,17 @@ import EChart, { C, baseOption } from "@/components/EChart";
 import NewsFeed from "@/components/NewsFeed";
 import { HoldingsEditor, PortfolioTracker } from "@/components/Portfolio";
 import RiskPanel from "@/components/RiskPanel";
-import { Card, CountUp, Empty, ErrorBox, Loading, PageTitle, ScoreBar, SentimentBadge, SignalChip, Sparkline, Stat, SymbolLink, Tabs, Tag, useApi } from "@/components/ui";
+import { Card, CountUp, Empty, ErrorBox, Loading, PageTitle, PriceSource, ScoreBar, SentimentBadge, SignalChip, Sparkline, Stat, SymbolLink, Tabs, Tag, useApi } from "@/components/ui";
 import type { J } from "@/lib/api";
+import { useLiveHoldings } from "@/lib/quotes";
 import { fmtMoney, fmtNum, fmtPct, signClass } from "@/lib/format";
 
 export default function MyPortfolio() {
   const router = useRouter();
   const pf = useApi("/api/holdings", 60000);
   const risk = useApi("/api/holdings/risk", 120000);
-  const d = pf.data;
+  const live = useLiveHoldings(pf.data);
+  const d = live.h;
   const refresh = () => {
     pf.mutate();
     risk.mutate();
@@ -41,8 +43,8 @@ export default function MyPortfolio() {
 
       {has && (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Stat label="Value" value={<CountUp value={d.value} format={(v) => fmtMoney(v, 0)} />} sub={`close of ${d.as_of}`} />
-          <Stat label="Last session" value={<CountUp value={d.day_change} format={(v) => fmtMoney(v, 0)} />} cls={signClass(d.day_change)} sub={fmtPct(d.day_change_pct, 2, true)} />
+          <Stat label="Value" value={<CountUp value={d.value} format={(v) => fmtMoney(v, 0)} />} sub={<PriceSource live={d.live} marketOpen={d.market_open} time={d.live_time} date={d.as_of} />} />
+          <Stat label={d.live && d.market_open ? "Today" : "Last session"} value={<CountUp value={d.day_change} format={(v) => fmtMoney(v, 0)} />} cls={signClass(d.day_change)} sub={fmtPct(d.day_change_pct, 2, true)} />
           <Stat label="Total gain" value={<CountUp value={d.gain} format={(v) => fmtMoney(v, 0)} />} cls={signClass(d.gain)} sub={`${fmtPct(d.gain_pct, 1, true)} on ${fmtMoney(d.invested, 0)} invested`} />
           <Stat label="Positions" value={d.n_positions} sub={`${d.lots.length} lot${d.lots.length === 1 ? "" : "s"}`} />
         </div>

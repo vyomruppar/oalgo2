@@ -5,6 +5,7 @@ real order."""
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timezone
 import hmac
 import json
 import logging
@@ -23,6 +24,7 @@ from sqlalchemy import func, select
 from ..alerts import engine as alerts
 from ..backtest.strategies import STRATEGIES
 from ..config import get_settings
+from ..data.quotes import Quotes
 from ..data.yahoo import INDEX_SYMBOLS, YahooPrices, last_bar_age_days
 from ..db import Alert, PaperPosition, ProviderHealth, ScanRun, ScoreHistory, Security, StockResult, init_db, kv_get, kv_set, session
 from ..jobs import pipeline, scheduler
@@ -624,6 +626,18 @@ def news_refresh(symbol: str | None = None) -> dict[str, Any]:
     if not names:
         raise HTTPException(404, "not a verified NYSE/NASDAQ listing")
     return news_service.refresh(names, ttl_seconds=300.0)
+
+
+@app.get("/api/quotes")
+def quotes(symbols: str = Query("", max_length=600)) -> dict[str, Any]:
+    """Live prices, delayed about 15 minutes, for holdings (default) or the listed symbols."""
+    want = [_sym(x) for x in symbols.split(",") if x.strip()] if symbols else holdings.symbols()
+    want = list(dict.fromkeys(want))[:60]
+    got = Quotes().get(want) if want else {}
+    open_now = any(q["market_open"] for q in got.values())
+    return {"quotes": got, "requested": len(want), "returned": len(got), "market_open": open_now,
+            "delay": "about 15 minutes", "source": "Yahoo Finance (unofficial), delayed",
+            "fetched_at": datetime.now(timezone.utc).isoformat()}
 
 
 # ---- dashboard and quant-lab data ---------------------------------------------------------------------

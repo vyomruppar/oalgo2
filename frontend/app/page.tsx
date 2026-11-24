@@ -5,13 +5,15 @@ import { useEffect, useState } from "react";
 import NewsFeed from "@/components/NewsFeed";
 import { HoldingTile, PortfolioTracker } from "@/components/Portfolio";
 import StarMap from "@/components/StarMap";
-import { Card, CountUp, Empty, ErrorBox, Loading, SignalChip, SymbolLink, Tag, useApi } from "@/components/ui";
+import { Card, CountUp, Empty, ErrorBox, Loading, PriceSource, SignalChip, SymbolLink, Tag, useApi } from "@/components/ui";
+import { useLiveHoldings } from "@/lib/quotes";
 import { NO_WRITES, READ_ONLY, send, type J } from "@/lib/api";
 import { fmtMoney, fmtPct, regimeLabel, signClass, timeAgo, titleCase } from "@/lib/format";
 import { stageLabel, useLive } from "@/lib/live";
 
 export default function Command() {
   const { data, error, mutate } = useApi("/api/dashboard", 60000);
+  const live = useLiveHoldings(data?.holdings);
   const { scan, events } = useLive();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -39,7 +41,7 @@ export default function Command() {
 
   if (error && !data) return <ErrorBox error={error} />;
   if (!data) return <Loading rows={8} />;
-  const h = data.holdings;
+  const h = live.h;
   const has = h.n_positions > 0;
   const regime = regimeLabel(data.regime?.regime);
   const running = scan.running || data.scan.running;
@@ -79,10 +81,10 @@ export default function Command() {
                     <div className="display num text-[30px] font-medium leading-none">
                       <CountUp value={h.value} format={(v) => fmtMoney(v, 0)} />
                     </div>
-                    <div className="mt-1 text-[11.5px] text-faint">at the close of {h.as_of}</div>
+                    <div className="mt-1.5"><PriceSource live={h.live} marketOpen={h.market_open} time={h.live_time} date={h.as_of} /></div>
                   </div>
                   <dl className="num grid grid-cols-2 gap-x-5 text-right text-[12.5px]">
-                    <dt className="text-faint">Last session</dt>
+                    <dt className="text-faint">{h.live && h.market_open ? "Today" : "Last session"}</dt>
                     <dd className={signClass(h.day_change)}>
                       {fmtMoney(h.day_change, 0)} ({fmtPct(h.day_change_pct, 2, true)})
                     </dd>

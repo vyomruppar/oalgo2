@@ -72,7 +72,7 @@ export function HoldingTile({ p }: { p: J }) {
       <div className="mt-2 flex items-end justify-between gap-2">
         <div>
           <div className="num text-[17px] font-medium">{fmtMoney(p.price)}</div>
-          <div className={`num text-[11.5px] ${signClass(p.day_change_pct)}`}>{fmtPct(p.day_change_pct, 2, true)} last session</div>
+          <div className={`num text-[11.5px] ${signClass(p.day_change_pct)}`}>{fmtPct(p.day_change_pct, 2, true)} {p.live && p.market_open ? "today" : "last session"}{p.live ? <span className="ml-1 text-up" title="Live price, delayed about 15 minutes">●</span> : <span className="ml-1 text-warn" title="Stored close from the last scan">○</span>}</div>
         </div>
         <Sparkline data={p.spark} />
       </div>

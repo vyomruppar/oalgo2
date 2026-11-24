@@ -124,3 +124,44 @@ def test_price_cache_is_refetched_when_a_newer_session_exists(tmp_env, monkeypat
     monkeypatch.setattr(y, "last_completed_session", lambda now=None: pd.Timestamp("2026-11-16").date())
     prov.fetch("AAPL")
     assert len(calls) == 1                                # a newer session exists -> refetch
+
+
+def test_parse_quotes_gives_price_change_and_rejects_bad_rows():
+    import time
+    from app.data.quotes import parse_quotes
+    now = int(time.time())
+    reg = {"start": now - 3600, "end": now + 3600}
+    meta = lambda price, prev, ts=now: {"regularMarketPrice": price, "chartPreviousClose": prev, "regularMarketTime": ts, "regularMarketVolume": 5,
+                                        "currentTradingPeriod": {"regular": reg}}
+    raw = json.dumps({"spark": {"result": [
+        {"symbol": "MU", "response": [{"meta": meta(632.55, 707.7)}]},
+        {"symbol": "OLD", "response": [{"meta": meta(10.0, 9.0, now - 7200)}]},
+        {"symbol": "BAD", "response": [{"meta": meta(None, 9.0)}]},
+        {"symbol": "ZERO", "response": [{"meta": meta(5.0, 0)}]},
+    ]}}).encode()
+    q = parse_quotes(raw)
+    assert set(q) == {"MU", "OLD"}
+    assert q["MU"]["change"] == pytest.approx(-75.15) and q["MU"]["change_pct"] == pytest.approx(632.55 / 707.7 - 1) and q["MU"]["market_open"] is True
+    assert q["OLD"]["market_open"] is False                    # an old quote is a last price, not a live one
+
+
+def test_quotes_fall_back_to_the_last_good_value_when_the_provider_fails(tmp_env, monkeypatch):
+    import time as _t
+    from app.data import quotes as Q
+    from app.data.http import ProviderError
+    Q._last_good.clear()
+    now = int(_t.time())
+    raw = json.dumps({"spark": {"result": [{"symbol": "MU", "response": [{"meta": {
+        "regularMarketPrice": 640.0, "chartPreviousClose": 707.7, "regularMarketTime": now,
+        "currentTradingPeriod": {"regular": {"start": now - 600, "end": now + 600}}}}]}]}}).encode()
+    q = Q.Quotes()
+    monkeypatch.setattr(q.http, "get", lambda url, **k: type("F", (), {"content": raw})())
+    assert q.get(["MU"])["MU"]["price"] == 640.0
+
+    def boom(url, **k):
+        raise ProviderError("yahoo_quotes", "HTTP 429", 429)
+    monkeypatch.setattr(q.http, "get", boom)
+    assert q.get(["MU"])["MU"]["price"] == 640.0                      # throttled: serve the last good quote
+    assert q.get(["AAPL"]) == {}                                      # nothing known: no invented price
+    Q._last_good["MU"] = (_t.time() - 16 * 60, Q._last_good["MU"][1])
+    assert q.get(["MU"]) == {}                                        # too old to pass off as current

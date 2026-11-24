@@ -205,3 +205,11 @@ export function Tabs({ tabs, current }: { tabs: { href: string; label: string }[
     </div>
   );
 }
+
+/** Says where a price comes from: live (delayed about 15 minutes), the last price after the close, or stored end-of-day data. */
+export function PriceSource({ live, marketOpen, time, date }: { live?: boolean; marketOpen?: boolean; time?: string | null; date?: string | null }) {
+  const t = time ? new Date(time).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : null;
+  if (live && marketOpen) return <span className="chip border-up/40 text-up" title="Prices from Yahoo Finance, delayed about 15 minutes">Live · delayed ~15 min{t ? ` · ${t}` : ""}</span>;
+  if (live) return <span className="chip border-line text-dim" title="The market is closed. This is the last price.">Market closed · last price{t ? ` ${t}` : ""}</span>;
+  return <span className="chip border-warn/50 text-warn" title="Stored from the last scan, not a live price">Stored close{date ? ` of ${date}` : ""}</span>;
+}

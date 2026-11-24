@@ -7,6 +7,7 @@ import useSWR from "swr";
 import { useEffect, useRef, useState } from "react";
 import { fetcher, QUEUED, SNAPSHOT } from "@/lib/api";
 import { regimeLabel, timeAgo } from "@/lib/format";
+import { weekdaysBetween } from "@/lib/quotes";
 import { LiveProvider, stageLabel, useLive } from "@/lib/live";
 import Backdrop from "./Backdrop";
 import { useApi } from "./ui";
@@ -109,9 +110,17 @@ function StatusBar() {
           Regime <span className={regime.cls}>{regime.label}</span>
         </span>
         <span className="ml-auto flex items-center gap-3">
-          <span className="chip border-warn/40 text-warn" title="Prices are daily bars of completed sessions from a delayed source. Nothing here is real-time.">
-            End-of-day data
-          </span>
+          {(() => {
+            const stale = weekdaysBetween(last?.stats?.price_as_of);
+            return stale >= 2 ? (
+              <Link href="/system" className="chip border-down/60 bg-down/10 text-down" title="Scores, signals and charts come from the last scan. Run a scan to refresh them.">
+                Scan data is from {last?.stats?.price_as_of}. Refresh
+              </Link>
+            ) : (
+              <span className="chip border-line text-dim" title="Scores and charts use stored end-of-day data from the last scan">Scores: end-of-day</span>
+            );
+          })()}
+          {!SNAPSHOT && <span className="chip border-up/40 text-up" title="Holdings and stock pages show live prices from Yahoo Finance, delayed about 15 minutes">Quotes: ~15 min delayed</span>}
           <Link href="/alerts" className="text-dim hover:text-ink">
             Alerts {data?.unread_alerts ? <span className="num rounded-full bg-accent/30 px-1.5 py-[1px] text-ink">{data.unread_alerts}</span> : <span className="num text-faint">0</span>}
           </Link>

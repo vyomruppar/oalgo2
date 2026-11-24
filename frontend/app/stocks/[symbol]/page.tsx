@@ -7,6 +7,8 @@ import CandleChart, { OVERLAYS } from "@/components/CandleChart";
 import EChart, { C, baseOption, catAxis, timeAxis, valueAxis, zoom } from "@/components/EChart";
 import { Banner, Card, Empty, ErrorBox, KV, Loading, Seg, SignalChip, Tag, useApi } from "@/components/ui";
 import NewsFeed from "@/components/NewsFeed";
+import { PriceSource } from "@/components/ui";
+import { useQuotes } from "@/lib/quotes";
 import { ApiError, send, SNAPSHOT, type J } from "@/lib/api";
 import { fmtCompact, fmtDateTime, fmtMoney, fmtNum, fmtPct, scoreColor, signClass, titleCase } from "@/lib/format";
 
@@ -66,6 +68,8 @@ export default function StockPage() {
   const info = useApi(`/api/stocks/${symbol}`);
   const prices = useApi(info.data?.researched ? `/api/stocks/${symbol}/prices?range=${range}` : null);
   const fund = useApi(info.data ? `/api/stocks/${symbol}/fundamentals` : null);
+  const quotes = useQuotes([symbol]);
+  const lq = quotes?.quotes?.[symbol];
 
   const p = prices.data;
   const subOption = useMemo(() => {
@@ -131,8 +135,10 @@ export default function StockPage() {
         </div>
         {res?.price != null && (
           <div className="text-right">
-            <div className="num text-2xl font-medium">{fmtMoney(res.price)}</div>
-            <div className="text-[11px] text-faint">Close of {res.price_date} · end-of-day, not real-time</div>
+            <div className="num text-2xl font-medium">{fmtMoney(lq ? lq.price : res.price)}</div>
+            {lq && <div className={`num text-[13px] ${signClass(lq.change_pct)}`}>{fmtMoney(lq.change)} ({fmtPct(lq.change_pct, 2, true)}) {lq.market_open ? "today" : "last session"}</div>}
+            <div className="mt-1"><PriceSource live={Boolean(lq)} marketOpen={lq?.market_open} time={lq?.time} date={res.price_date} /></div>
+            {lq && <div className="mt-1 text-[11px] text-faint">Score and signal use the stored close of {res.price_date}.</div>}
           </div>
         )}
       </div>
