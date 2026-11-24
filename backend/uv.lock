@@ -761,6 +761,22 @@ wheels = [
 ]
 
 [[package]]
+name = "nodejs-wheel-binaries"
+version = "24.17.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/11/10/107d977f9b869d70a1a6db837e248debea03bd8799ecd040efbe33a4757a/nodejs_wheel_binaries-24.17.0.tar.gz", hash = "sha256:4be1adc73c2733a47a25596913384538448fd429aeed44afd01b9c44396a7f4d", size = 8061, upload-time = "2026-08-19T21:53:55.97Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a9/6a/6a6823612b3629d7a764c7f4eec9a41a1b22a3ac9791716e3836d38a69f1/nodejs_wheel_binaries-24.17.0-py2.py3-none-macosx_13_0_arm64.whl", hash = "sha256:1bf061913d8e17ddc205438f9849740404bd138c8f883dba878048d81989d6b6", size = 56047207, upload-time = "2026-08-19T21:53:23.447Z" },
+    { url = "https://files.pythonhosted.org/packages/e2/9a/0cc20e9c786462205c31f2d82c2588f99c667091d4b9cf1dadf336cc73e5/nodejs_wheel_binaries-24.17.0-py2.py3-none-macosx_13_0_x86_64.whl", hash = "sha256:5cb1ed95f960b4ea538c2ab606df6ad2e5706c7989e0b924449509d042562150", size = 56219467, upload-time = "2026-08-19T21:53:27.706Z" },
+    { url = "https://files.pythonhosted.org/packages/b4/12/9690f64cd9a174783461b2213dc357fb794b384ddff3370747e63d57e606/nodejs_wheel_binaries-24.17.0-py2.py3-none-manylinux_2_28_aarch64.whl", hash = "sha256:f4a561747b105835b6e7f1dcd66f65b22eb68c4f500c7e94f6906185f42befb6", size = 60588243, upload-time = "2026-08-19T21:53:31.784Z" },
+    { url = "https://files.pythonhosted.org/packages/e2/c9/3f94c285cf97c26ddac45c12f1cc8cb6b6deb4964578a8334eb8f674c4a1/nodejs_wheel_binaries-24.17.0-py2.py3-none-manylinux_2_28_x86_64.whl", hash = "sha256:5b3574a05decd4f53d2cc49bbce05735dec52d3a3aad0a1837f5217d039822ce", size = 61123512, upload-time = "2026-08-19T21:53:36.314Z" },
+    { url = "https://files.pythonhosted.org/packages/57/6f/b712d59a4cb266ee82a79ce66f1101e6dc129625b20bb41da74bbda57111/nodejs_wheel_binaries-24.17.0-py2.py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:125b8bfc0cd2a6fb1b396d7b69d9f5ec6dd26d01486c9a9240e99266a6105d81", size = 62632866, upload-time = "2026-08-19T21:53:40.539Z" },
+    { url = "https://files.pythonhosted.org/packages/44/37/728454d7d0e5050f201ebf8a029ed706aa7284bde1895ce2d807ffeb7336/nodejs_wheel_binaries-24.17.0-py2.py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:f56eaddba93dde07bac61c4015afaa41864dbd165b40dd15a9ad377011ea8d96", size = 63250650, upload-time = "2026-08-19T21:53:44.92Z" },
+    { url = "https://files.pythonhosted.org/packages/91/c3/acabf3ff0d310bcea2a13b2b7313abb78cab5ca24b0e50c54eabd6c68119/nodejs_wheel_binaries-24.17.0-py2.py3-none-win_amd64.whl", hash = "sha256:ff42e785dd32ca65c593ad332f02cd357bc66ef5337f0479633696b4ef5f65ad", size = 42448498, upload-time = "2026-08-19T21:53:49.087Z" },
+    { url = "https://files.pythonhosted.org/packages/eb/7c/5aec86a7fcba5e4bdde0b0aec37121c74c134a1c2664fa095c620b5b4cb5/nodejs_wheel_binaries-24.17.0-py2.py3-none-win_arm64.whl", hash = "sha256:bf2784f20cc068516547daced91838d2ff135181054e781d01de9d25d9a0c1f7", size = 40090157, upload-time = "2026-08-19T21:53:52.692Z" },
+]
+
+[[package]]
 name = "numpy"
 version = "2.4.6"
 source = { registry = "https://pypi.org/simple" }
@@ -956,6 +972,9 @@ ai = [
     { name = "torch", version = "2.15.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "sys_platform == 'linux'" },
     { name = "transformers" },
 ]
+desktop = [
+    { name = "nodejs-wheel-binaries" },
+]
 dev = [
     { name = "pytest" },
     { name = "ruff" },
@@ -984,6 +1003,7 @@ ai = [
     { name = "torch", marker = "sys_platform == 'linux'", specifier = ">=2.4", index = "https://download.pytorch.org/whl/cpu" },
     { name = "transformers", specifier = ">=4.44" },
 ]
+desktop = [{ name = "nodejs-wheel-binaries", specifier = "==24.17.0" }]
 dev = [
     { name = "pytest", specifier = ">=8" },
     { name = "ruff", specifier = ">=0.6" },

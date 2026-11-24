@@ -23,6 +23,8 @@ dependencies = [
 dev = ["pytest>=8", "ruff>=0.6"]
 # Optional local sentiment model (FinBERT). Install with: uv sync --group ai
 ai = ["torch>=2.4", "transformers>=4.44"]
+# Node.js for the one-click Windows launcher (Start Here.bat); no separate Node install needed
+desktop = ["nodejs-wheel-binaries==24.17.0"]
 
 [[tool.uv.index]]
 name = "pytorch-cpu"

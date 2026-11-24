@@ -4,7 +4,11 @@ A research and paper-trading workstation for NYSE- and NASDAQ-listed stocks. It 
 
 **Research and paper trading only. It cannot place a real order, and nothing here is investment advice.**
 
-## Quick start
+## Start here (Windows)
+
+Download the repository as a ZIP from GitHub, extract it, and double-click **Start Here**. It installs what it needs on the first start (about 10 minutes, 2 GB), then opens the dashboard in its own window. Close the window to stop it. Full guide: [`docs/desktop.md`](docs/desktop.md).
+
+## Quick start (developers)
 
 Requirements: Python 3.11+, [uv](https://docs.astral.sh/uv/), Node 20+, [pnpm](https://pnpm.io/).
 

@@ -24,3 +24,4 @@ queue-branch/
 ci.log
 build.log
 frontend/.vercel/
+data/logs/
