@@ -26,9 +26,27 @@ if not exist "%UV%" goto :fail
 echo   Getting everything ready. The first start downloads about 2 GB
 echo   and can take 10 minutes. Later starts take a few seconds.
 echo.
+
+rem Keep this file small and unchanging: updates never replace it, because it is the file running them.
+rem Exit code 75 = oalgo2 asked to install a downloaded update, then start again.
+rem Exit code 76 = the updated version would not start, so go back to the previous one.
+:run
+if not exist "data\updates\pending.json" goto :start
+copy /y "launcher\apply_update.py" "%TEMP%\oalgo2_apply.py" >nul
+"%UV%" run --no-project --python 3.13 "%TEMP%\oalgo2_apply.py" "%CD%"
+
+:start
 "%UV%" run --project backend --frozen --no-dev --group ai --group desktop python launcher\launch.py %*
-if errorlevel 1 goto :fail
+set "CODE=%errorlevel%"
+if "%CODE%"=="75" goto :run
+if "%CODE%"=="76" goto :rollback
+if not "%CODE%"=="0" goto :fail
 exit /b 0
+
+:rollback
+copy /y "launcher\apply_update.py" "%TEMP%\oalgo2_apply.py" >nul
+"%UV%" run --no-project --python 3.13 "%TEMP%\oalgo2_apply.py" "%CD%" rollback
+goto :start
 
 :zipped
 echo.

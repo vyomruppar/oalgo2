@@ -23,6 +23,7 @@ from sqlalchemy import func, select
 
 from ..alerts import engine as alerts
 from ..backtest.strategies import STRATEGIES
+from .. import updater
 from ..config import get_settings
 from ..data.quotes import Quotes
 from ..data.yahoo import INDEX_SYMBOLS, YahooPrices, last_bar_age_days
@@ -638,6 +639,51 @@ def quotes(symbols: str = Query("", max_length=600)) -> dict[str, Any]:
     return {"quotes": got, "requested": len(want), "returned": len(got), "market_open": open_now,
             "delay": "about 15 minutes", "source": "Yahoo Finance (unofficial), delayed",
             "fetched_at": datetime.now(timezone.utc).isoformat()}
+
+
+# ---- software updates (desktop install only) ---------------------------------------------------------
+def _update_status(force: bool = False) -> dict[str, Any]:
+    if not updater.enabled():
+        return {"enabled": False}
+    info = updater.check(force=force)
+    return {"enabled": True, **info, "job": dict(updater.job), "scan_running": pipeline.is_running(),
+            "restart_pending": (updater.UPDATES / "restart.flag").exists()}
+
+
+@app.get("/api/update/status")
+def update_status() -> dict[str, Any]:
+    return _update_status()
+
+
+@app.post("/api/update/check")
+def update_check() -> dict[str, Any]:
+    return _update_status(force=True)
+
+
+@app.post("/api/update/install", status_code=202)
+def update_install() -> dict[str, Any]:
+    """Download the newest version, then restart into it. One click from the dashboard."""
+    if not updater.enabled():
+        raise HTTPException(400, "Updates are only available in the desktop app.")
+    if pipeline.is_running():
+        raise HTTPException(409, "A scan is running. Wait for it to finish, then update.")
+    info = updater.check(force=True)
+    if info.get("error"):
+        raise HTTPException(502, info["error"])
+    if not info.get("latest_sha"):
+        raise HTTPException(502, "Could not find the newest version.")
+    if not info.get("update_available"):
+        raise HTTPException(409, "You already have the newest version.")
+    if not updater.start_install(info["latest_sha"]):
+        raise HTTPException(409, "An update is already in progress.")
+    return {"started": True}
+
+
+@app.post("/api/update/dismiss")
+def update_dismiss() -> dict[str, Any]:
+    if updater.job["state"] in ("error", "staged"):
+        updater.reset_job()
+    return {"ok": True}
 
 
 # ---- dashboard and quant-lab data ---------------------------------------------------------------------

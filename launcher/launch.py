@@ -40,8 +40,16 @@ def say(msg: str) -> None:
     print(f"  {msg}", flush=True)
 
 
+RESTART_FOR_UPDATE = 75  # "Start Here.bat": install the staged update, then start again
+ROLL_BACK = 76  # "Start Here.bat": the new version would not start, go back to the previous one
+UPDATES = DATA / "updates"
+
+
 def fail(msg: str) -> None:
     print(f"\n  Could not start oalgo2: {msg}\n", flush=True)
+    if (UPDATES / "just-applied.json").exists():
+        print("  The new version did not start. Going back to the version that worked.\n", flush=True)
+        sys.exit(ROLL_BACK)
     sys.exit(1)
 
 
@@ -213,22 +221,16 @@ def find_browser() -> str | None:
     return None
 
 
-def open_window(wait: bool) -> bool:
-    """Open the dashboard in its own app window. Returns True if we can tell when it is closed."""
+def open_window() -> subprocess.Popen | None:
+    """Open the dashboard in its own app window. Returns the window's process, or None if we cannot track it."""
     browser = find_browser()
     if not browser:
         webbrowser.open(UI)
-        return False
+        return None
     profile = Path(os.environ.get("LOCALAPPDATA", Path.home() / ".local" / "share")) / "oalgo2" / "window"
     profile.mkdir(parents=True, exist_ok=True)
     cmd = [browser, f"--app={UI}", f"--user-data-dir={profile}", "--window-size=1500,950", "--no-first-run", "--no-default-browser-check"]
-    started = time.time()
-    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    if not wait:
-        return False
-    proc.wait()
-    # an already-open oalgo2 window takes over the request and this process exits at once
-    return time.time() - started > 4
+    return subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def make_shortcut() -> None:
@@ -256,6 +258,7 @@ def make_shortcut() -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description="Start oalgo2 on this computer.")
     ap.add_argument("--no-window", action="store_true", help="do not open a window (keep running until Ctrl+C)")
+    ap.add_argument("--no-catchup", action="store_true", help="do not start a scan when the data is old")
     args = ap.parse_args()
 
     # stop cleanly however we are asked to: Ctrl+C, Ctrl+Break, or a termination request
@@ -271,7 +274,7 @@ def main() -> None:
     if api_busy and ui_busy and ours():
         say("oalgo2 is already running. Opening its window.")
         if not args.no_window:
-            open_window(wait=False)
+            open_window()
         return
     if api_busy and not ours():
         fail(f"another program is using port {API_PORT}, which the research engine needs. Close it and try again.")
@@ -283,7 +286,7 @@ def main() -> None:
     build_dashboard(node, npx_cli)
 
     say("Starting the research engine and the dashboard.")
-    env = dict(os.environ, OALGO_DATA_DIR=str(DATA), OALGO_SCHEDULER_ENABLED="true", PYTHONUNBUFFERED="1")
+    env = dict(os.environ, OALGO_DATA_DIR=str(DATA), OALGO_SCHEDULER_ENABLED="true", PYTHONUNBUFFERED="1", OALGO_DESKTOP="1")
     procs: list[subprocess.Popen] = []
     try:
         api = start([sys.executable, "-m", "uvicorn", "app.api.main:app", "--host", "127.0.0.1", "--port", str(API_PORT)], BACKEND, env, "research-engine.log")
@@ -293,17 +296,33 @@ def main() -> None:
         procs.append(ui)
         wait_for(f"{API}/api/health", api, "research engine", "research-engine.log")
         wait_for(f"{UI}/login", ui, "dashboard", "dashboard.log")
-        catch_up_scan()
+        if not args.no_catchup:
+            catch_up_scan()
         if not args.no_window:
             make_shortcut()
         say(f"Ready: {UI}")
-        if not args.no_window and open_window(wait=True):
-            say("Window closed. Stopping oalgo2.")
-            return
-        say("oalgo2 is running. Leave this window open while you use it; close it (or press Ctrl+C) to stop.")
-        while all(p.poll() is None for p in procs):
+        (UPDATES / "just-applied.json").unlink(missing_ok=True)  # the new version started: keep it
+        (UPDATES / "restart.flag").unlink(missing_ok=True)
+        window = None if args.no_window else open_window()
+        tracked = window is not None
+        started = time.time()
+        if not tracked:
+            say("oalgo2 is running. Leave this window open while you use it; close it (or press Ctrl+C) to stop.")
+        while True:
+            if (UPDATES / "restart.flag").exists() and (UPDATES / "pending.json").exists():
+                say("Restarting to install the update. This window will reopen by itself.")
+                if window is not None:
+                    stop([window])
+                code = RESTART_FOR_UPDATE
+                break
+            if not all(p.poll() is None for p in procs):
+                fail(f"a part of oalgo2 stopped unexpectedly. Details are in {LOGS}")
+            if tracked and window.poll() is not None and time.time() - started > 4:
+                say("Window closed. Stopping oalgo2.")
+                return
             time.sleep(1)
-        fail(f"a part of oalgo2 stopped unexpectedly. Details are in {LOGS}")
+        stop(procs)
+        sys.exit(code)
     except KeyboardInterrupt:
         say("Stopping oalgo2.")
     finally:

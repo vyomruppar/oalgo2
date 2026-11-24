@@ -4,9 +4,10 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import EChart, { C, baseOption, catAxis, valueAxis } from "@/components/EChart";
 import { Card, Empty, ErrorBox, Loading, PageTitle, ScoreBar, SignalChip, Stat, SymbolLink, Tag, useApi } from "@/components/ui";
-import { NO_WRITES, QUEUED, READ_ONLY, send, type J } from "@/lib/api";
+import { NO_WRITES, QUEUED, READ_ONLY, send, SNAPSHOT, type J } from "@/lib/api";
 import { fmtCompact, fmtDateTime, fmtMoney, fmtNum, regimeLabel, timeAgo, titleCase } from "@/lib/format";
 import { stageLabel, useLive } from "@/lib/live";
+import { UpdateCard } from "@/components/Updater";
 
 const SIGNAL_ORDER = ["STRONG BUY", "BUY", "WATCHLIST", "HOLD", "SELL", "NO_ACTION", "None"];
 const SIGNAL_COLOR: Record<string, string> = { "STRONG BUY": C.up, BUY: "#23b894", WATCHLIST: C.accent, HOLD: "#4a5296", SELL: C.down, NO_ACTION: "#2a3070", None: "#1c2156" };
@@ -315,6 +316,7 @@ export default function Overview() {
         </Card>
       </div>
       {QUEUED && <ChangeLog />}
+      {!SNAPSHOT && <UpdateCard />}
     </>
   );
 }

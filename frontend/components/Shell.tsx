@@ -10,6 +10,7 @@ import { regimeLabel, timeAgo } from "@/lib/format";
 import { weekdaysBetween } from "@/lib/quotes";
 import { LiveProvider, stageLabel, useLive } from "@/lib/live";
 import Backdrop from "./Backdrop";
+import { UpdateChip } from "./Updater";
 import { useApi } from "./ui";
 
 type Item = { href: string; label: string; match?: string };
@@ -120,6 +121,7 @@ function StatusBar() {
               <span className="chip border-line text-dim" title="Scores and charts use stored end-of-day data from the last scan">Scores: end-of-day</span>
             );
           })()}
+          {!SNAPSHOT && <UpdateChip />}
           {!SNAPSHOT && <span className="chip border-up/40 text-up" title="Holdings and stock pages show live prices from Yahoo Finance, delayed about 15 minutes">Quotes: ~15 min delayed</span>}
           <Link href="/alerts" className="text-dim hover:text-ink">
             Alerts {data?.unread_alerts ? <span className="num rounded-full bg-accent/30 px-1.5 py-[1px] text-ink">{data.unread_alerts}</span> : <span className="num text-faint">0</span>}
