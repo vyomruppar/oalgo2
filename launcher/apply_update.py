@@ -124,6 +124,8 @@ def restore(root: Path, quiet: bool = False) -> int:
         vf.write_text(m["previous_version_file"])      # exactly as it was
     elif m.get("new_sha") and vf.exists():
         vf.unlink()                                   # there was no version record before the update
+    if m.get("new_sha") and not quiet:
+        (updates / "rolled-back.json").write_text(json.dumps({"sha": m["new_sha"], "at": datetime.now(timezone.utc).isoformat()}))
     (updates / "just-applied.json").unlink(missing_ok=True)
     (updates / "restart.flag").unlink(missing_ok=True)
     if not quiet:

@@ -36,11 +36,13 @@ The first start also puts an **oalgo2 Observatory** shortcut on your Desktop.
 
 ## Updating to a newer version
 
-1. Close oalgo2.
-2. Download and extract the new ZIP as in "First time".
-3. Copy the `data` folder from your old oalgo2 folder into the new one, replacing the empty one if asked.
-4. Start the new copy. It rebuilds the dashboard once (about 2 minutes) and points the Desktop shortcut at the new folder.
-5. Delete the old folder.
+Click **Update** in the status bar at the top of the app (it appears when a newer version exists; **Scans and data** has a "Software updates" card with a "Check for updates" button). Then click **Update now**. oalgo2 downloads the new version, closes, installs it, rebuilds the dashboard if needed and reopens by itself. Your data folder, holdings and installed packages are never touched. Updates are blocked while a scan is running.
+
+If the new version fails to start, the old version is restored automatically and that broken version is not offered again until a newer one is published.
+
+Updates come from the `claude/admiring-hypatia-8mav3t` branch of `vyomruppar/oalgo2` on GitHub (set in `launcher/update.json`). The check needs internet and is cached for 30 minutes.
+
+**One-time step if your copy has no Update button:** it was installed before updating existed. Do the manual update once: close oalgo2, download and extract the new ZIP, copy your `data` folder into it, start it, delete the old folder. After that the button does everything.
 
 ## If something goes wrong
 

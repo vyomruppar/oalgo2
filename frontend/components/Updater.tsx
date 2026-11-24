@@ -66,7 +66,7 @@ export function UpdateDialog({ onClose }: { onClose: () => void }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="upd-title" onClick={() => !busy && onClose()}>
       <div className="card w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
         <h2 id="upd-title" className="display text-[17px] font-medium">
-          {busy ? "Updating oalgo2" : job.state === "error" ? "The update did not finish" : data?.update_available ? "A new version is ready" : "oalgo2 is up to date"}
+          {busy ? "Updating oalgo2" : job.state === "error" ? "The update did not finish" : data?.error ? "Could not check for updates" : data?.update_available ? "A new version is ready" : data?.blocked_reason ? "The latest version was undone" : "oalgo2 is up to date"}
         </h2>
 
         {busy ? (
@@ -97,7 +97,8 @@ export function UpdateDialog({ onClose }: { onClose: () => void }) {
                 </p>
               </div>
             )}
-            {!data?.update_available && !data?.error && <p className="mt-3 text-[12.5px] text-dim">You have the newest version ({short(data?.installed_sha)}).</p>}
+            {data?.blocked_reason && <p className="mt-3 text-[12.5px] text-warn">{data.blocked_reason}</p>}
+            {!data?.update_available && !data?.error && !data?.blocked_reason && <p className="mt-3 text-[12.5px] text-dim">You have the newest version ({short(data?.installed_sha)}).</p>}
             {data?.scan_running && data?.update_available && <p className="mt-3 text-[12.5px] text-warn">A scan is running. Wait for it to finish, then update.</p>}
             <div className="mt-5 flex items-center justify-end gap-2">
               <button className="btn" onClick={recheck} disabled={checking}>
@@ -143,7 +144,7 @@ export function UpdateCard() {
   const [open, setOpen] = useState(false);
   if (!data?.enabled) return null;
   return (
-    <Card title="Software updates" className="mt-3" right={data.update_available ? <Tag tone="accent">Update available</Tag> : <Tag tone="up">Up to date</Tag>}>
+    <Card title="Software updates" className="mt-3" right={data.error ? <Tag tone="warn">Could not check</Tag> : data.update_available ? <Tag tone="accent">Update available</Tag> : data.blocked_reason ? <Tag tone="warn">Latest undone</Tag> : <Tag tone="up">Up to date</Tag>}>
       <div className="flex flex-wrap items-center justify-between gap-3 text-[12.5px]">
         <div>
           <div>
@@ -151,7 +152,7 @@ export function UpdateCard() {
             {data.installed_at ? <span className="text-faint"> · updated {fmtDateTime(data.installed_at)}</span> : <span className="text-faint"> · from a manual download</span>}
           </div>
           <div className="text-dim">
-            {data.error ? data.error : data.update_available ? `Newest: ${data.latest_message}` : "You have the newest version."} <span className="text-faint">Checked {fmtDateTime(data.checked_at)}</span>
+            {data.error ? data.error : data.update_available ? `Newest: ${data.latest_message}` : data.blocked_reason ? data.blocked_reason : "You have the newest version."} <span className="text-faint">Checked {fmtDateTime(data.checked_at)}</span>
           </div>
         </div>
         <button className="btn btn-primary" onClick={() => setOpen(true)}>

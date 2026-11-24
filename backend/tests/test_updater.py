@@ -245,3 +245,22 @@ def test_update_endpoints(upd, monkeypatch, tmp_env):
         monkeypatch.setenv("OALGO_DESKTOP", "0")
         assert c.get("/api/update/status").json() == {"enabled": False}
         assert c.post("/api/update/install").status_code == 400
+
+
+def test_a_version_that_failed_to_start_is_not_offered_again(upd, monkeypatch):
+    upd.UPDATES.mkdir(parents=True)
+    monkeypatch.setattr(upd, "_get_json", lambda url: {"sha": SHA_NEW, "commit": {"message": "broken release", "committer": {}}, "commits": []})
+    assert upd.check(force=True)["update_available"] is True
+    (upd.UPDATES / "rolled-back.json").write_text(json.dumps({"sha": SHA_NEW}))
+    s = upd.check(force=True)
+    assert s["update_available"] is False and "did not start" in s["blocked_reason"]
+    monkeypatch.setattr(upd, "_get_json", lambda url: {"sha": "c" * 40, "commit": {"message": "fixed release", "committer": {}}, "commits": []})
+    assert upd.check(force=True)["update_available"] is True                    # a newer version is offered normally
+
+
+def test_rollback_records_which_version_failed(tmp_path, apply_mod):
+    tree(tmp_path, OLD)
+    stage_files(tmp_path)
+    apply_mod.apply(tmp_path)
+    apply_mod.restore(tmp_path)
+    assert json.loads((tmp_path / "data/updates/rolled-back.json").read_text())["sha"] == SHA_NEW

@@ -99,6 +99,15 @@ def check(force: bool = False) -> dict[str, Any]:
         out["error"] = "GitHub is limiting requests right now. Try again in a few minutes." if e.code in (403, 429) else f"GitHub answered {e.code}."
     except (urllib.error.URLError, OSError, KeyError, ValueError):
         out["error"] = "Could not reach GitHub. Check your internet connection."
+    try:
+        bad = json.loads((UPDATES / "rolled-back.json").read_text())
+        out["rolled_back_sha"] = bad.get("sha")
+        if bad.get("sha") and bad["sha"] == out["latest_sha"]:
+            # this exact version did not start here and was undone: do not offer it again
+            out["update_available"] = False
+            out["blocked_reason"] = "The newest version did not start on this computer, so it was undone. It will be offered again when a newer one is published."
+    except (OSError, ValueError):
+        pass
     if out["error"] is None:
         with _lock:
             _cache.update(at=time.time(), value=out)
