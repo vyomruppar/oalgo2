@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import useSWR from "swr";
 import { fetcher, send, type J } from "@/lib/api";
 import { fmtDateTime } from "@/lib/format";
@@ -59,7 +60,9 @@ export function UpdateDialog({ onClose }: { onClose: () => void }) {
     }
   };
 
-  return (
+  // Rendered at the page root: the status bar's blur would otherwise become the dialog's frame of reference.
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="upd-title" onClick={() => !busy && onClose()}>
       <div className="card w-full max-w-md p-5" onClick={(e) => e.stopPropagation()}>
         <h2 id="upd-title" className="display text-[17px] font-medium">
@@ -112,7 +115,8 @@ export function UpdateDialog({ onClose }: { onClose: () => void }) {
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
